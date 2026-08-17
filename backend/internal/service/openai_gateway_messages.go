@@ -732,6 +732,11 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.L().Error("readOpenAICompatBufferedTerminal: panic in SSE reader goroutine", zap.Any("panic", r))
+			}
+		}()
 		defer close(events)
 		for scanner.Scan() {
 			select {
@@ -1143,6 +1148,11 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		}
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.L().Error("handleAnthropicStreamingResponse: panic in SSE reader goroutine", zap.Any("panic", r))
+			}
+		}()
 		defer close(events)
 		for scanner.Scan() {
 			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())

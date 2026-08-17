@@ -443,6 +443,11 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func(scanBuf *sseScannerBuf64K) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LegacyPrintf("service.gateway", "ALERT: panic in handleStreamingResponseAnthropicAPIKeyPassthrough SSE reader goroutine: %v", r)
+			}
+		}()
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		for scanner.Scan() {
