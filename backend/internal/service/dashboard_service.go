@@ -221,6 +221,20 @@ func (s *DashboardService) GetGroupUsageSummary(ctx context.Context, todayStart 
 	return results, nil
 }
 
+// GetGroupUsageTotals returns all-time request count and standard cost for a single group.
+func (s *DashboardService) GetGroupUsageTotals(ctx context.Context, groupID int64) (requests int64, cost float64, err error) {
+	epoch := time.Unix(0, 0).UTC()
+	horizon := time.Now().UTC().AddDate(1, 0, 0)
+	results, err := s.usageRepo.GetGroupStatsWithFilters(ctx, epoch, horizon, 0, 0, 0, groupID, nil, nil, nil)
+	if err != nil {
+		return 0, 0, fmt.Errorf("get group usage totals: %w", err)
+	}
+	if len(results) == 0 {
+		return 0, 0, nil
+	}
+	return results[0].Requests, results[0].Cost, nil
+}
+
 func (s *DashboardService) getCachedDashboardStats(ctx context.Context) (*usagestats.DashboardStats, bool, error) {
 	data, err := s.cache.GetDashboardStats(ctx)
 	if err != nil {

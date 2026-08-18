@@ -279,6 +279,25 @@ func (s *APIKeyRepoSuite) TestCountByGroupID() {
 	s.Require().Equal(int64(1), count)
 }
 
+func (s *APIKeyRepoSuite) TestCountActiveByGroupID() {
+	user := s.mustCreateUser("countactivegroup@test.com")
+	group := s.mustCreateGroup("g-count-active")
+	s.mustCreateApiKey(user.ID, "sk-cag-1", "K1", &group.ID)
+	s.mustCreateApiKey(user.ID, "sk-cag-2", "K2", &group.ID)
+	disabled := s.mustCreateApiKey(user.ID, "sk-cag-3", "K3", &group.ID)
+	disabled.Status = service.StatusDisabled
+	s.Require().NoError(s.repo.Update(s.ctx, disabled, service.APIKeyUpdateFields{Status: true}), "disable key")
+	s.mustCreateApiKey(user.ID, "sk-cag-other-group", "K4", nil) // different group entirely
+
+	total, err := s.repo.CountByGroupID(s.ctx, group.ID)
+	s.Require().NoError(err, "CountByGroupID")
+	s.Require().Equal(int64(3), total, "disabled key still counts toward total")
+
+	active, err := s.repo.CountActiveByGroupID(s.ctx, group.ID)
+	s.Require().NoError(err, "CountActiveByGroupID")
+	s.Require().Equal(int64(2), active, "disabled key excluded from active count")
+}
+
 // --- ExistsByKey ---
 
 func (s *APIKeyRepoSuite) TestExistsByKey() {

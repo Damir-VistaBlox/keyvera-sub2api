@@ -48,6 +48,19 @@ func (s *adminServiceImpl) GetGroup(ctx context.Context, id int64) (*Group, erro
 	return s.groupRepo.GetByID(ctx, id)
 }
 
+// GetGroupAPIKeyStats returns the total and active API key counts bound to a group.
+func (s *adminServiceImpl) GetGroupAPIKeyStats(ctx context.Context, groupID int64) (total, active int64, err error) {
+	total, err = s.apiKeyRepo.CountByGroupID(ctx, groupID)
+	if err != nil {
+		return 0, 0, err
+	}
+	active, err = s.apiKeyRepo.CountActiveByGroupID(ctx, groupID)
+	if err != nil {
+		return 0, 0, err
+	}
+	return total, active, nil
+}
+
 func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
 	platform = strings.TrimSpace(platform)
 	if id > 0 {

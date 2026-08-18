@@ -47,6 +47,16 @@ func (r *RedeemCode) CanUse() bool {
 	return r.Status == StatusUnused && !r.IsExpired()
 }
 
+// RedeemCodeStats summarizes redeem code counts and value across the whole system.
+type RedeemCodeStats struct {
+	TotalCodes            int64
+	ActiveCodes           int64
+	UsedCodes             int64
+	ExpiredCodes          int64
+	TotalValueDistributed float64
+	ByType                map[string]int64
+}
+
 func GenerateRedeemCode() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

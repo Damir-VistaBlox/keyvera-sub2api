@@ -408,6 +408,77 @@ func (r *redeemCodeRepository) SumPositiveBalanceByUser(ctx context.Context, use
 	return result[0].Sum, nil
 }
 
+// GetStats returns system-wide redeem code counts and distributed value.
+// "Active" and "expired" mirror service.RedeemCode.IsExpiredAt: a code is
+// expired if its status says so OR it's still unused but past expires_at,
+// so the three buckets (used/active/expired) stay mutually exclusive and
+// exhaustive without a second predicate for expired_codes.
+func (r *redeemCodeRepository) GetStats(ctx context.Context) (*service.RedeemCodeStats, error) {
+	now := time.Now()
+
+	total, err := r.client.RedeemCode.Query().Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	used, err := r.client.RedeemCode.Query().
+		Where(redeemcode.StatusEQ(service.StatusUsed)).
+		Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	active, err := r.client.RedeemCode.Query().
+		Where(
+			redeemcode.StatusEQ(service.StatusUnused),
+			redeemcode.Or(
+				redeemcode.ExpiresAtIsNil(),
+				redeemcode.ExpiresAtGT(now),
+			),
+		).
+		Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var sumResult []struct {
+		Sum float64 `json:"sum"`
+	}
+	if err := r.client.RedeemCode.Query().
+		Where(redeemcode.StatusEQ(service.StatusUsed)).
+		Aggregate(dbent.As(dbent.Sum(redeemcode.FieldValue), "sum")).
+		Scan(ctx, &sumResult); err != nil {
+		return nil, err
+	}
+	var totalValueDistributed float64
+	if len(sumResult) > 0 {
+		totalValueDistributed = sumResult[0].Sum
+	}
+
+	byType := make(map[string]int64, 4)
+	for _, t := range []string{
+		service.RedeemTypeBalance,
+		service.RedeemTypeConcurrency,
+		service.RedeemTypeSubscription,
+		service.RedeemTypeInvitation,
+	} {
+		count, err := r.client.RedeemCode.Query().Where(redeemcode.TypeEQ(t)).Count(ctx)
+		if err != nil {
+			return nil, err
+		}
+		byType[t] = int64(count)
+	}
+
+	return &service.RedeemCodeStats{
+		TotalCodes:            int64(total),
+		ActiveCodes:           int64(active),
+		UsedCodes:             int64(used),
+		ExpiredCodes:          int64(total) - int64(used) - int64(active),
+		TotalValueDistributed: totalValueDistributed,
+		ByType:                byType,
+	}, nil
+}
+
 func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 	if m == nil {
 		return nil
