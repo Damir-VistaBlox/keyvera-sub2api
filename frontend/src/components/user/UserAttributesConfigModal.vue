@@ -247,6 +247,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -289,7 +290,7 @@ const loadAttributes = async () => {
   try {
     attributes.value = await adminAPI.userAttributes.listDefinitions()
   } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.users.attributes.failedToLoad'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.users.attributes.failedToLoad')))
   } finally {
     loading.value = false
   }
@@ -374,7 +375,7 @@ const handleSave = async () => {
     const msg = editingAttribute.value
       ? t('admin.users.attributes.failedToUpdate')
       : t('admin.users.attributes.failedToCreate')
-    appStore.showError(error.response?.data?.detail || msg)
+    appStore.showError(extractApiErrorMessage(error, msg))
   } finally {
     saving.value = false
   }
@@ -395,7 +396,7 @@ const handleDelete = async () => {
     deletingAttribute.value = null
     loadAttributes()
   } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.users.attributes.failedToDelete'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.users.attributes.failedToDelete')))
   }
 }
 

@@ -6,6 +6,7 @@ import { opsAPI } from '@/api/admin/ops'
 import type { EmailNotificationConfig, AlertSeverity } from '../types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -35,7 +36,7 @@ async function loadConfig() {
     config.value = data
   } catch (err: any) {
     console.error('[OpsEmailNotificationCard] Failed to load config', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.email.loadFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.email.loadFailed')))
   } finally {
     loading.value = false
   }
@@ -54,7 +55,7 @@ async function saveConfig() {
     appStore.showSuccess(t('admin.ops.email.saveSuccess'))
   } catch (err: any) {
     console.error('[OpsEmailNotificationCard] Failed to save config', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.email.saveFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.email.saveFailed')))
   } finally {
     saving.value = false
   }

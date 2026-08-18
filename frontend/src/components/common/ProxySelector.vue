@@ -173,6 +173,7 @@ import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import Icon from '@/components/icons/Icon.vue'
 import type { Proxy } from '@/types'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 
@@ -261,7 +262,7 @@ const handleTestProxy = async (proxy: Proxy) => {
   } catch (error: any) {
     testResults[proxy.id] = {
       success: false,
-      message: error.response?.data?.detail || 'Test failed'
+      message: extractApiErrorMessage(error, 'Test failed')
     }
   } finally {
     testingProxyIds.delete(proxy.id)
@@ -282,7 +283,7 @@ const handleBatchTest = async () => {
     } catch (error: any) {
       testResults[proxy.id] = {
         success: false,
-        message: error.response?.data?.detail || 'Test failed'
+        message: extractApiErrorMessage(error, 'Test failed')
       }
     } finally {
       testingProxyIds.delete(proxy.id)

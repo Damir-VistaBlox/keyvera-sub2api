@@ -97,6 +97,7 @@ import type { BatchUpdateUserLimitsRequest } from '@/api/admin/users'
 import { useAppStore } from '@/stores/app'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Toggle from '@/components/common/Toggle.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const props = defineProps<{
   show: boolean
@@ -203,9 +204,7 @@ const handleSubmit = async () => {
     emit('close')
   } catch (error: any) {
     appStore.showError(
-      error.response?.data?.message
-      || error.response?.data?.detail
-      || t('admin.users.bulkLimits.failed')
+      extractApiErrorMessage(error, t('admin.users.bulkLimits.failed'))
     )
   } finally {
     submitting.value = false

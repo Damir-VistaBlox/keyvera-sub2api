@@ -207,6 +207,7 @@ import type { Account } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import OAuthAuthorizationFlow from '@/components/account/OAuthAuthorizationFlow.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 // Type for exposed OAuthAuthorizationFlow component
 // Note: defineExpose automatically unwraps refs, so we use the unwrapped types
@@ -426,7 +427,7 @@ const handleExchangeCode = async () => {
       emit('reauthorized', updatedAccount)
       handleClose()
     } catch (error: any) {
-      oauthClient.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      oauthClient.error.value = extractApiErrorMessage(error, t('admin.accounts.oauth.authFailed'))
       appStore.showError(oauthClient.error.value)
     }
   } else if (isGemini.value) {
@@ -459,7 +460,7 @@ const handleExchangeCode = async () => {
       emit('reauthorized', updatedAccount)
       handleClose()
     } catch (error: any) {
-      geminiOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      geminiOAuth.error.value = extractApiErrorMessage(error, t('admin.accounts.oauth.authFailed'))
       appStore.showError(geminiOAuth.error.value)
     }
   } else if (isAntigravity.value) {
@@ -491,7 +492,7 @@ const handleExchangeCode = async () => {
       emit('reauthorized', updatedAccount)
       handleClose()
     } catch (error: any) {
-      antigravityOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      antigravityOAuth.error.value = extractApiErrorMessage(error, t('admin.accounts.oauth.authFailed'))
       appStore.showError(antigravityOAuth.error.value)
     }
   } else if (isGrok.value) {
@@ -524,7 +525,7 @@ const handleExchangeCode = async () => {
       emit('reauthorized', updatedAccount)
       handleClose()
     } catch (error: any) {
-      grokOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      grokOAuth.error.value = extractApiErrorMessage(error, t('admin.accounts.oauth.authFailed'))
       appStore.showError(grokOAuth.error.value)
     }
   } else {
@@ -560,7 +561,7 @@ const handleExchangeCode = async () => {
       emit('reauthorized', updatedAccount)
       handleClose()
     } catch (error: any) {
-      claudeOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      claudeOAuth.error.value = extractApiErrorMessage(error, t('admin.accounts.oauth.authFailed'))
       appStore.showError(claudeOAuth.error.value)
     } finally {
       claudeOAuth.loading.value = false
@@ -600,7 +601,7 @@ const handleCookieAuth = async (sessionKey: string) => {
     handleClose()
   } catch (error: any) {
     claudeOAuth.error.value =
-      error.response?.data?.detail || t('admin.accounts.oauth.cookieAuthFailed')
+      extractApiErrorMessage(error, t('admin.accounts.oauth.cookieAuthFailed'))
   } finally {
     claudeOAuth.loading.value = false
   }
@@ -643,9 +644,7 @@ const handleGrokImportSSO = async (ssoInput: string) => {
     await applyGrokReauthTokenInfo(tokenInfo)
   } catch (error: any) {
     grokOAuth.error.value =
-      error.response?.data?.detail ||
-      error.message ||
-      t('admin.accounts.oauth.grok.failedToValidateSSO', 'Failed to validate Grok SSO')
+      extractApiErrorMessage(error, t('admin.accounts.oauth.grok.failedToValidateSSO', 'Failed to validate Grok SSO'))
     appStore.showError(grokOAuth.error.value)
   } finally {
     grokOAuth.loading.value = false
@@ -672,9 +671,7 @@ const handleGrokValidateRefreshToken = async (refreshTokenInput: string) => {
     await applyGrokReauthTokenInfo(tokenInfo)
   } catch (error: any) {
     grokOAuth.error.value =
-      error.response?.data?.detail ||
-      error.message ||
-      t('admin.accounts.oauth.grok.failedToValidateRT')
+      extractApiErrorMessage(error, t('admin.accounts.oauth.grok.failedToValidateRT'))
     appStore.showError(grokOAuth.error.value)
   } finally {
     grokOAuth.loading.value = false

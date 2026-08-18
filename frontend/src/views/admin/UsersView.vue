@@ -810,6 +810,7 @@ import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsMod
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const appStore = useAppStore()
 
@@ -1615,7 +1616,7 @@ const loadUsers = async () => {
     if (errorInfo?.name === 'AbortError' || errorInfo?.name === 'CanceledError' || errorInfo?.code === 'ERR_CANCELED') {
       return
     }
-    const message = error.response?.data?.detail || error.message || t('admin.users.failedToLoad')
+    const message = extractApiErrorMessage(error, t('admin.users.failedToLoad'))
     appStore.showError(message)
     console.error('Error loading users:', error)
   } finally {
@@ -1728,7 +1729,7 @@ const handleToggleStatus = async (user: AdminUser) => {
     )
     loadUsers()
   } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.users.failedToToggle'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.users.failedToToggle')))
     console.error('Error toggling user status:', error)
   }
 }
@@ -1780,7 +1781,7 @@ const confirmDelete = async () => {
     deletingUser.value = null
     loadUsers()
   } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.users.failedToDelete'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.users.failedToDelete')))
     console.error('Error deleting user:', error)
   }
 }
