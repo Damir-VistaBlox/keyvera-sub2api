@@ -150,36 +150,15 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 		err  error
 	}
 	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	go func(scanBuf *sseScannerBuf64K) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
-			}
-		}()
-		defer putSSEScannerBuf64K(scanBuf)
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}(scanBuf)
+	events := startSSEReader(scanner, scanBuf, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.antigravity_gateway", "antigravity streaming",
+	)
 	defer close(done)
 
 	// 上游数据间隔超时保护（防止上游挂起长期占用连接）
@@ -351,37 +330,15 @@ func (s *AntigravityGatewayService) handleGeminiStreamToNonStreaming(c *gin.Cont
 	}
 
 	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
-
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	go func(scanBuf *sseScannerBuf64K) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
-			}
-		}()
-		defer putSSEScannerBuf64K(scanBuf)
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}(scanBuf)
+	events := startSSEReader(scanner, scanBuf, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.antigravity_gateway", "antigravity streaming",
+	)
 	defer close(done)
 
 	// 上游数据间隔超时保护（防止上游挂起长期占用连接）
@@ -827,37 +784,15 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 	}
 
 	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
-
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	go func(scanBuf *sseScannerBuf64K) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
-			}
-		}()
-		defer putSSEScannerBuf64K(scanBuf)
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}(scanBuf)
+	events := startSSEReader(scanner, scanBuf, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.antigravity_gateway", "antigravity streaming",
+	)
 	defer close(done)
 
 	// 上游数据间隔超时保护（防止上游挂起长期占用连接）
@@ -1057,36 +992,15 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 		err  error
 	}
 	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	go func(scanBuf *sseScannerBuf64K) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
-			}
-		}()
-		defer putSSEScannerBuf64K(scanBuf)
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}(scanBuf)
+	events := startSSEReader(scanner, scanBuf, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.antigravity_gateway", "antigravity streaming",
+	)
 	defer close(done)
 
 	streamInterval := time.Duration(0)

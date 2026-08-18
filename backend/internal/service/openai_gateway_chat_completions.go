@@ -892,35 +892,15 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		line string
 		err  error
 	}
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.L().Error("handleChatStreamingResponse: panic in SSE reader goroutine", zap.Any("panic", r))
-			}
-		}()
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}()
+	events := startSSEReader(scanner, nil, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.openai_gateway", "handleChatStreamingResponse",
+	)
 	defer close(done)
 
 	var keepaliveTicker *time.Ticker

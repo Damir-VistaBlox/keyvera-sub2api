@@ -430,36 +430,15 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		line string
 		err  error
 	}
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	go func(scanBuf *sseScannerBuf64K) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.gateway", "ALERT: panic in handleStreamingResponseAnthropicAPIKeyPassthrough SSE reader goroutine: %v", r)
-			}
-		}()
-		defer putSSEScannerBuf64K(scanBuf)
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}(scanBuf)
+	events := startSSEReader(scanner, scanBuf, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.gateway", "handleStreamingResponseAnthropicAPIKeyPassthrough",
+	)
 	defer close(done)
 
 	streamInterval := time.Duration(0)
