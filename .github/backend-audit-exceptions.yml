@@ -1,0 +1,37 @@
+version: 1
+exceptions:
+  - package: github.com/lib/pq
+    advisory: "GO-2026-6172"
+    severity: high
+    reason: "CVE-2026-56873: pre-validation memory exhaustion from oversized backend frame lengths. Requires a malicious/compromised PostgreSQL server or an active network MITM on the DB connection -- the driver's DSN (host/port/user/password/sslmode) is sourced entirely from operator-configured server-side settings (internal/config/config.go DatabaseConfig.DSN), never from HTTP/API request input, so no external API consumer can influence which Postgres server this app connects to."
+    mitigation: "Operators should run the database on a private network/trusted VPC and set sslmode=verify-full with a validated server certificate for defense-in-depth against network-position attackers. No fix released upstream yet (checked 2026-08-18); revisit on expiry or when lib/pq ships a patch."
+    expires_on: "2026-11-16"
+    owner: "security@your-domain"
+  - package: github.com/lib/pq
+    advisory: "GO-2026-6171"
+    severity: high
+    reason: "CVE-2026-56872: unrecovered panic from malformed RowDescription/DataRow messages. Same precondition as GO-2026-6172 -- a malicious/compromised PostgreSQL server or active network MITM, not reachable via application-level input."
+    mitigation: "Same as GO-2026-6172: private network + sslmode=verify-full recommended for operators. No fix released upstream yet (checked 2026-08-18)."
+    expires_on: "2026-11-16"
+    owner: "security@your-domain"
+  - package: github.com/lib/pq
+    advisory: "GO-2026-6170"
+    severity: high
+    reason: "CVE-2026-56871: unrecovered panic from a malformed backend frame length (negative payload length after the driver's length-4 subtraction). Same precondition as GO-2026-6172 -- a malicious/compromised PostgreSQL server or active network MITM, not reachable via application-level input."
+    mitigation: "Same as GO-2026-6172: private network + sslmode=verify-full recommended for operators. No fix released upstream yet (checked 2026-08-18)."
+    expires_on: "2026-11-16"
+    owner: "security@your-domain"
+  - package: github.com/lib/pq
+    advisory: "GO-2026-6168"
+    severity: high
+    reason: "CVE-2026-56869: unbounded SCRAM iteration count in lib/pq/scram causes a CPU DoS during the auth handshake. Requires a malicious/compromised PostgreSQL server (or MITM) to send an attacker-controlled SCRAM server-first message -- same trust boundary as GO-2026-6172, not reachable via application-level input."
+    mitigation: "Same as GO-2026-6172: private network + sslmode=verify-full recommended for operators. No fix released upstream yet (checked 2026-08-18)."
+    expires_on: "2026-11-16"
+    owner: "security@your-domain"
+  - package: github.com/lib/pq
+    advisory: "GO-2026-6166"
+    severity: high
+    reason: "CVE-2026-56868: GSS authentication can complete without mutual proof. Only reachable if GSSAPI auth is actually negotiated with the server; this codebase's DatabaseConfig has no gssencmode/GSS-related settings at all (grepped internal/config), so GSS auth is never configured here. Also requires the same malicious/compromised-server or MITM precondition as the other 4 findings."
+    mitigation: "Not applicable unless a deployment manually enables GSSAPI auth outside this app's config surface, which isn't supported today. No fix released upstream yet (checked 2026-08-18)."
+    expires_on: "2026-11-16"
+    owner: "security@your-domain"
