@@ -28,7 +28,13 @@ jobs:
         working-directory: backend
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+          govulncheck ./... > govulncheck-output.txt 2>&1 || true
+          cat govulncheck-output.txt
+      - name: Check govulncheck exceptions
+        run: |
+          python3 tools/check_govulncheck_exceptions.py \
+            --govulncheck-output backend/govulncheck-output.txt \
+            --exceptions .github/backend-audit-exceptions.yml
 
   frontend-security:
     runs-on: ubuntu-latest
