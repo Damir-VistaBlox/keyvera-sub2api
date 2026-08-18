@@ -141,6 +141,7 @@ func (r *PostgreSQLRepository) MarkStagingFailed(ctx context.Context, jobID int6
 }
 
 func (r *PostgreSQLRepository) ClaimNextJob(ctx context.Context, now time.Time) (*Job, bool, error) {
+	//nolint:gosec // G202: jobColumns is only ever called with literal aliases ("j", "prompt_audit_jobs"), never user input
 	row := r.db.QueryRowContext(ctx, `
 		WITH candidate AS (
 			SELECT id FROM prompt_audit_jobs

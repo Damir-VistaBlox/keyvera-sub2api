@@ -336,6 +336,7 @@ func (r *usageCleanupRepository) deleteUsageLogsBatchWithRollupInvalidation(ctx 
 	if err := lockGroupUsageRollupState(ctx, tx); err != nil {
 		return rollback(err)
 	}
+	//nolint:gosec // G201: whereClause's only production caller (DeleteUsageLogsBatch) builds it via buildUsageCleanupWhere, which emits fixed "$N"-placeholder clauses with every value bound via args
 	query := fmt.Sprintf(`
 		WITH target AS (
 			SELECT id

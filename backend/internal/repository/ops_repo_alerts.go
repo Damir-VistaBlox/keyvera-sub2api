@@ -337,6 +337,7 @@ func (r *opsRepository) ListAlertEvents(ctx context.Context, filter *service.Ops
 	args = append(args, limit)
 	limitArg := "$" + itoa(len(args))
 
+	//nolint:gosec // G202: where comes from buildOpsAlertEventsWhere, which emits fixed "$N"-placeholder clauses with every value bound via args; limitArg is itoa(int)
 	q := `
 SELECT
   id,

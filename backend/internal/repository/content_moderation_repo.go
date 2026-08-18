@@ -92,6 +92,7 @@ func (r *contentModerationRepository) ListLogs(ctx context.Context, filter servi
 	}
 	queryArgs := append([]any{}, args...)
 	queryArgs = append(queryArgs, params.Limit(), params.Offset())
+	//nolint:gosec // G202: whereSQL comes from buildContentModerationLogWhere, which emits fixed "$N"-placeholder clauses (including the free-text Search filter) with every value bound via args
 	rows, err := r.db.QueryContext(ctx, `
 SELECT
     l.id, l.request_id, l.user_id, l.user_email, l.api_key_id, l.api_key_name, l.group_id, l.group_name,

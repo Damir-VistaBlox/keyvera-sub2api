@@ -65,6 +65,7 @@ WITH stats AS (
 		return nil, err
 	}
 
+	//nolint:gosec // G202: baseCTE embeds join/where from buildUsageWhere, which is $N-parameterized (see also countSQL above, built the same way but not flagged by gosec here)
 	querySQL := baseCTE + `
 SELECT
   model,

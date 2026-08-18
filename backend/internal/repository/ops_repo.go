@@ -231,6 +231,7 @@ func (r *opsRepository) ListErrorLogs(ctx context.Context, filter *service.OpsEr
 
 	offset := (page - 1) * pageSize
 	argsWithLimit := append(args, pageSize, offset)
+	//nolint:gosec // G202: where comes from buildOpsErrorLogsWhere ($N-parameterized); opsErrorLogsOrderBy returns a switch-allowlisted column+direction, never raw input
 	selectSQL := `
 SELECT
   e.id,
@@ -755,6 +756,7 @@ func (r *opsRepository) ListSystemLogs(ctx context.Context, filter *service.OpsS
 
 	offset := (page - 1) * pageSize
 	argsWithLimit := append(args, pageSize, offset)
+	//nolint:gosec // G202: where comes from buildOpsSystemLogsWhere, which emits fixed "$N"-placeholder clauses with every value bound via args
 	query := `
 SELECT
   l.id,
@@ -853,7 +855,7 @@ func (r *opsRepository) DeleteSystemLogs(ctx context.Context, filter *service.Op
 		return 0, fmt.Errorf("cleanup requires at least one filter condition")
 	}
 
-	query := "DELETE FROM ops_system_logs l " + where
+	query := "DELETE FROM ops_system_logs l " + where //nolint:gosec // G202: where comes from buildOpsSystemLogsCleanupWhere, which delegates to buildOpsSystemLogsWhere ($N-parameterized)
 	res, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err

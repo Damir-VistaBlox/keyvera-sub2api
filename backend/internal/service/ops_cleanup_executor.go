@@ -63,6 +63,29 @@ func opsCleanupPlan(now time.Time, days int) (cutoff time.Time, truncate, ok boo
 	return now.AddDate(0, 0, -days), false, true
 }
 
+// opsCleanupAllowedTables/opsCleanupAllowedTimeColumns are the only
+// identifiers deleteOldRowsByID/truncateOpsTable may splice into SQL text.
+// runCleanupOnce's targets slice is the sole production caller and already
+// only ever passes these values, but neither function validates its inputs
+// on its own -- a future caller threading a request-derived string through
+// here would otherwise be a real SQL injection with no automated backstop.
+var opsCleanupAllowedTables = map[string]struct{}{
+	"ops_error_logs":                {},
+	"ops_ingress_reject_aggregates": {},
+	"ops_alert_events":              {},
+	"ops_system_logs":               {},
+	"ops_system_log_cleanup_audits": {},
+	"ops_system_metrics":            {},
+	"ops_metrics_hourly":            {},
+	"ops_metrics_daily":             {},
+}
+
+var opsCleanupAllowedTimeColumns = map[string]struct{}{
+	"created_at":   {},
+	"bucket_start": {},
+	"bucket_date":  {},
+}
+
 func opsCleanupRunOne(
 	ctx context.Context,
 	db *sql.DB,
@@ -72,6 +95,12 @@ func opsCleanupRunOne(
 	castDate bool,
 	batchSize int,
 ) (int64, error) {
+	if _, ok := opsCleanupAllowedTables[table]; !ok {
+		return 0, fmt.Errorf("ops cleanup: table %q is not in the allowed set", table)
+	}
+	if _, ok := opsCleanupAllowedTimeColumns[timeCol]; !ok {
+		return 0, fmt.Errorf("ops cleanup: time column %q is not in the allowed set", timeCol)
+	}
 	if truncate {
 		return truncateOpsTable(ctx, db, table)
 	}
@@ -99,6 +128,7 @@ func deleteOldRowsByID(
 		where = fmt.Sprintf("%s < $1::date", timeColumn)
 	}
 
+	//nolint:gosec // G201: table/timeColumn are validated against opsCleanupAllowedTables/opsCleanupAllowedTimeColumns in opsCleanupRunOne before this is ever called
 	q := fmt.Sprintf(`
 WITH batch AS (
   SELECT id FROM %s

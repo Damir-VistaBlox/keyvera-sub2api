@@ -411,6 +411,7 @@ func (r *opsRepository) listHourlyMetricsRows(ctx context.Context, filter *servi
 		where += " AND platform IS NULL AND group_id IS NULL"
 	}
 
+	//nolint:gosec // G202: where is built above entirely from fixed literals and "$N"-placeholder fmt.Sprintf calls; groupID/platform are always bound via args, never spliced into text
 	q := `
 SELECT
   bucket_start,

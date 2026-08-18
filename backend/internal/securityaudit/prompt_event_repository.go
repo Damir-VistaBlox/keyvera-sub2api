@@ -78,7 +78,7 @@ func (r *PostgreSQLRepository) ListEvents(ctx context.Context, filter EventFilte
 	queryArgs := append([]any(nil), args...)
 	limitIndex := len(queryArgs) + 1
 	queryArgs = append(queryArgs, pageSize, (page-1)*pageSize)
-	rows, err := r.db.QueryContext(ctx, `SELECT `+eventColumns("e")+` FROM prompt_audit_events e`+where+
+	rows, err := r.db.QueryContext(ctx, `SELECT `+eventColumns("e")+` FROM prompt_audit_events e`+where+ //nolint:gosec // G202: eventColumns is only ever called with the literal alias "e"; where comes from buildEventWhere, which emits fixed "$N"-placeholder clauses with every value bound via args
 		fmt.Sprintf(` ORDER BY e.created_at DESC, e.id DESC LIMIT $%d OFFSET $%d`, limitIndex, limitIndex+1), queryArgs...)
 	if err != nil {
 		return nil, err
@@ -187,6 +187,7 @@ func (r *PostgreSQLRepository) DeleteEventsByFilter(ctx context.Context, filter 
 		maxIndex := len(args) + 1
 		limitIndex := maxIndex + 1
 		args = append(args, snapshotMaxID, batchSize)
+		//nolint:gosec // G202: where comes from buildEventWhere, which emits fixed "$N"-placeholder clauses with every value bound via args
 		rows, err := tx.QueryContext(ctx, `
 			WITH selected AS (
 				SELECT e.id FROM prompt_audit_events e`+where+

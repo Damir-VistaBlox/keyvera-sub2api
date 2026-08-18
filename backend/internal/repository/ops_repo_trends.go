@@ -38,6 +38,7 @@ func (r *opsRepository) GetThroughputTrend(ctx context.Context, filter *service.
 	usageBucketExpr := opsBucketExprForUsage(bucketSeconds)
 	errorBucketExpr := opsBucketExprForError(bucketSeconds)
 
+	//nolint:gosec // G202: usage/errorBucketExpr are switches over an int returning fixed literals; usageJoin/usageWhere/errorWhere come from buildUsageWhere/buildErrorWhere ($N-parameterized)
 	q := `
 WITH usage_buckets AS (
   SELECT ` + usageBucketExpr + ` AS bucket,
@@ -448,6 +449,7 @@ func (r *opsRepository) GetErrorTrend(ctx context.Context, filter *service.OpsDa
 	where, args, _ := buildErrorWhere(filter, start, end, 1)
 	bucketExpr := opsBucketExprForError(bucketSeconds)
 
+	//nolint:gosec // G202: bucketExpr is a switch over an int returning a fixed literal; where comes from buildErrorWhere ($N-parameterized)
 	q := `
 SELECT
   ` + bucketExpr + ` AS bucket,
@@ -560,6 +562,7 @@ func (r *opsRepository) GetErrorDistribution(ctx context.Context, filter *servic
 	end := filter.EndTime.UTC()
 	where, args, _ := buildErrorWhere(filter, start, end, 1)
 
+	//nolint:gosec // G202: where comes from buildErrorWhere ($N-parameterized)
 	q := `
 SELECT
   COALESCE(upstream_status_code, status_code, 0) AS status_code,
