@@ -107,7 +107,6 @@ func TestAnthropicNativeLinePump_DataResetsTimer(t *testing.T) {
 }
 
 func TestCCStreamingFromNativeAnthropic_HangTimesOut(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(1)
 
 	rec := httptest.NewRecorder()
@@ -132,7 +131,6 @@ func TestCCStreamingFromNativeAnthropic_HangTimesOut(t *testing.T) {
 }
 
 func TestCCBufferedFromNativeAnthropic_HangTimesOut(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(1)
 
 	rec := httptest.NewRecorder()
@@ -157,7 +155,6 @@ func TestCCBufferedFromNativeAnthropic_HangTimesOut(t *testing.T) {
 }
 
 func TestResponsesStreamingFromNativeAnthropic_HangTimesOut(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(1)
 
 	rec := httptest.NewRecorder()
@@ -182,7 +179,6 @@ func TestResponsesStreamingFromNativeAnthropic_HangTimesOut(t *testing.T) {
 }
 
 func TestCCStreamingFromNativeAnthropic_HappyPathStillConverts(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(5)
 
 	rec := httptest.NewRecorder()
@@ -213,7 +209,6 @@ func TestCCStreamingFromNativeAnthropic_HappyPathStillConverts(t *testing.T) {
 }
 
 func TestCCBufferedFromNativeAnthropic_HappyPathStillConverts(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(5)
 
 	rec := httptest.NewRecorder()

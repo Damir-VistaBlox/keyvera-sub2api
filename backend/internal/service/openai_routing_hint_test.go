@@ -73,7 +73,6 @@ func TestSetOpenAICodexRoutingHintCanonicalizesOfficialServiceTiers(t *testing.T
 }
 
 func TestOpenAIOAuthHTTPBuildersSendRoutingHintFromFinalBody(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	oauthAccount := &Account{
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
@@ -122,7 +121,6 @@ func TestOpenAIOAuthHTTPBuildersSendRoutingHintFromFinalBody(t *testing.T) {
 }
 
 func TestOpenAIHTTPPassthroughStripsOnlyOAuthLegacyResponsesBeta(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := &OpenAIGatewayService{cfg: &config.Config{
 		Security: config.SecurityConfig{
 			URLAllowlist: config.URLAllowlistConfig{Enabled: false},
@@ -183,7 +181,6 @@ func TestOpenAIHTTPPassthroughStripsOnlyOAuthLegacyResponsesBeta(t *testing.T) {
 }
 
 func TestBuildOpenAIWSHeadersSendsOAuthRoutingHintOnly(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
@@ -221,7 +218,6 @@ func TestBuildOpenAIWSHeadersSendsOAuthRoutingHintOnly(t *testing.T) {
 }
 
 func TestOpenAIRoutingDiagnosticsUseFinalDerivedValuesOnly(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	logSink, restore := captureStructuredLog(t)
 	defer restore()
 
