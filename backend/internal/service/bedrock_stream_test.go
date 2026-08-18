@@ -82,7 +82,7 @@ func TestExtractEventStreamHeaderValue(t *testing.T) {
 		// value type (7 = string)
 		_ = buf.WriteByte(7)
 		// value length (2 bytes, big-endian)
-		_ = binary.Write(&buf, binary.BigEndian, uint16(len(value)))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(len(value))) //nolint:gosec // G115: test-only: value is len() of a short hardcoded literal string in a test helper
 		// value
 		_, _ = buf.WriteString(value)
 		return buf.Bytes()
@@ -125,8 +125,8 @@ func TestBedrockEventStreamDecoder(t *testing.T) {
 		// :event-type header
 		_ = headersBuf.WriteByte(byte(len(":event-type")))
 		_, _ = headersBuf.WriteString(":event-type")
-		_ = headersBuf.WriteByte(7) // string type
-		_ = binary.Write(&headersBuf, binary.BigEndian, uint16(len(eventType)))
+		_ = headersBuf.WriteByte(7)                                             // string type
+		_ = binary.Write(&headersBuf, binary.BigEndian, uint16(len(eventType))) //nolint:gosec // G115: test-only: value is len() of a short hardcoded literal string in a test helper
 		_, _ = headersBuf.WriteString(eventType)
 		// :message-type header
 		_ = headersBuf.WriteByte(byte(len(":message-type")))
@@ -136,9 +136,9 @@ func TestBedrockEventStreamDecoder(t *testing.T) {
 		_, _ = headersBuf.WriteString("event")
 
 		headers := headersBuf.Bytes()
-		headersLen := uint32(len(headers))
+		headersLen := uint32(len(headers)) //nolint:gosec // G115: test-only: value sums fixed prelude/CRC overhead with tiny hardcoded test payload lengths
 		// total = 12 (prelude) + headers + payload + 4 (message_crc)
-		totalLen := uint32(12 + len(headers) + len(payload) + 4)
+		totalLen := uint32(12 + len(headers) + len(payload) + 4) //nolint:gosec // G115: test-only: value sums fixed prelude/CRC overhead with tiny hardcoded test payload lengths
 
 		// Prelude: total_length(4) + headers_length(4)
 		var preludeBuf bytes.Buffer
@@ -221,8 +221,8 @@ func TestBedrockEventStreamDecoder(t *testing.T) {
 		_, _ = headersBuf.WriteString("chunk")
 
 		headers := headersBuf.Bytes()
-		headersLen := uint32(len(headers))
-		totalLen := uint32(12 + len(headers) + len(payload) + 4)
+		headersLen := uint32(len(headers))                       //nolint:gosec // G115: test-only: value sums fixed prelude/CRC overhead with tiny hardcoded test payload lengths
+		totalLen := uint32(12 + len(headers) + len(payload) + 4) //nolint:gosec // G115: test-only: value sums fixed prelude/CRC overhead with tiny hardcoded test payload lengths
 
 		var preludeBuf bytes.Buffer
 		_ = binary.Write(&preludeBuf, binary.BigEndian, totalLen)

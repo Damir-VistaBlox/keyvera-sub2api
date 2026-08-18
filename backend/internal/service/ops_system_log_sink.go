@@ -213,8 +213,8 @@ func (s *OpsSystemLogSink) run() {
 		} else {
 			failures = 0
 			suppressedUntil = time.Time{}
-			atomic.AddUint64(&s.writtenCount, uint64(inserted))
-			atomic.AddUint64(&s.totalDelayNs, uint64(delay.Nanoseconds()))
+			atomic.AddUint64(&s.writtenCount, uint64(inserted))            //nolint:gosec // G115: inserted is bounded above by batchSize, hardcoded to 200 in NewOpsSystemLogSink
+			atomic.AddUint64(&s.totalDelayNs, uint64(delay.Nanoseconds())) //nolint:gosec // G115: delay = time.Since(started) is always >=0 by Go's monotonic-clock guarantee, with started captured immediately prior in the same closure
 			s.lastError.Store("")
 		}
 		batch = batch[:0]

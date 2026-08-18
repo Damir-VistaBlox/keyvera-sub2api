@@ -76,7 +76,7 @@ func (e *ApplicationError) WithMetadata(md map[string]string) *ApplicationError 
 func New(code int, reason, message string) *ApplicationError {
 	return &ApplicationError{
 		Status: Status{
-			Code:    int32(code),
+			Code:    int32(code), //nolint:gosec // G115: code is always a hardcoded http.Status* constant at every call site in this package
 			Message: message,
 			Reason:  reason,
 		},

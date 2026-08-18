@@ -1898,7 +1898,7 @@ func minimalSilentWAV() []byte {
 	dataSize := numSamples * 2
 	buf := make([]byte, 44+dataSize)
 	copy(buf[0:], []byte("RIFF"))
-	binary.LittleEndian.PutUint32(buf[4:], uint32(36+dataSize))
+	binary.LittleEndian.PutUint32(buf[4:], uint32(36+dataSize)) //nolint:gosec // G115: value is 36+400=836, from compile-time local constants inside minimalSilentWAV
 	copy(buf[8:], []byte("WAVE"))
 	copy(buf[12:], []byte("fmt "))
 	binary.LittleEndian.PutUint32(buf[16:], 16) // PCM chunk size

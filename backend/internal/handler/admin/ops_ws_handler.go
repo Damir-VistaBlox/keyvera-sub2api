@@ -690,14 +690,14 @@ func loadOpsWSRuntimeLimitsFromEnv() opsWSRuntimeLimits {
 
 	if v := strings.TrimSpace(os.Getenv(envOpsWSMaxConns)); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
-			cfg.MaxConns = int32(parsed)
+			cfg.MaxConns = int32(parsed) //nolint:gosec // G109: envOpsWSMaxConns is an operator-set startup env var, not request input, guarded >0
 		} else {
 			logger.LegacyPrintf("handler.admin.ops_ws", "[OpsWS] invalid %s=%q (expected int>0); using default=%d", envOpsWSMaxConns, v, cfg.MaxConns)
 		}
 	}
 	if v := strings.TrimSpace(os.Getenv(envOpsWSMaxConnsPerIP)); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil && parsed >= 0 {
-			cfg.MaxConnsPerIP = int32(parsed)
+			cfg.MaxConnsPerIP = int32(parsed) //nolint:gosec // G109: envOpsWSMaxConnsPerIP is an operator-set startup env var, not request input, guarded >=0
 		} else {
 			logger.LegacyPrintf("handler.admin.ops_ws", "[OpsWS] invalid %s=%q (expected int>=0); using default=%d", envOpsWSMaxConnsPerIP, v, cfg.MaxConnsPerIP)
 		}

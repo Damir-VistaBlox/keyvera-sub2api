@@ -746,10 +746,10 @@ func deriveOpenAISelectionSeed(req OpenAIAccountScheduleRequest) uint64 {
 	seed := hasher.Sum64()
 	// 对“无会话锚点”的纯负载均衡请求引入时间熵，避免固定命中同一账号。
 	if strings.TrimSpace(req.SessionHash) == "" && strings.TrimSpace(req.PreviousResponseID) == "" {
-		seed ^= uint64(time.Now().UnixNano())
+		seed ^= uint64(time.Now().UnixNano()) //nolint:gosec // G115: UnixNano() is XORed into a PRNG seed only as a fallback entropy source, always non-negative
 	}
 	if seed == 0 {
-		seed = uint64(time.Now().UnixNano()) ^ 0x9e3779b97f4a7c15
+		seed = uint64(time.Now().UnixNano()) ^ 0x9e3779b97f4a7c15 //nolint:gosec // G115: same fallback-seed pattern, only reached when the primary hash-derived seed is exactly 0
 	}
 	return seed
 }
@@ -799,7 +799,7 @@ func buildOpenAIWeightedSelectionOrder(
 				}
 			}
 		} else {
-			selectedIdx = int(rng.nextUint64() % uint64(len(pool)))
+			selectedIdx = int(rng.nextUint64() % uint64(len(pool))) //nolint:gosec // G115: modulo result is mathematically bounded to [0,len(pool)-1] by construction
 		}
 
 		order = append(order, pool[selectedIdx])

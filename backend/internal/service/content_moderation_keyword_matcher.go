@@ -46,19 +46,19 @@ func newContentModerationKeywordMatcher(keywords []string) *contentModerationKey
 		for _, label := range []byte(strings.ToLower(keyword)) {
 			next := contentModerationKeywordBuildTransition(buildNodes, buildEdges, state, label)
 			if next < 0 {
-				next = int32(len(buildNodes))
+				next = int32(len(buildNodes)) //nolint:gosec // G115: trie node count is bounded by normalizeBlockedKeywords to 10000 keywords x 200 runes, ~8M worst case, far under int32
 				buildNodes = append(buildNodes, newContentModerationKeywordNode())
 				buildEdges = append(buildEdges, contentModerationKeywordBuildEdge{
 					target:      next,
 					nextSibling: contentModerationKeywordBuildFirstEdge(buildNodes[state]),
 					label:       label,
 				})
-				buildNodes[state].edgeStart = uint32(len(buildEdges))
+				buildNodes[state].edgeStart = uint32(len(buildEdges)) //nolint:gosec // G115: trie edge count is bounded by the same 10000x200 keyword limit, far under uint32
 			}
 			state = next
 		}
-		if current := buildNodes[state].bestKeyword; current < 0 || int32(keywordIndex) < current {
-			buildNodes[state].bestKeyword = int32(keywordIndex)
+		if current := buildNodes[state].bestKeyword; current < 0 || int32(keywordIndex) < current { //nolint:gosec // G115: keywordIndex is capped at maxContentModerationBlockedKeywords=10000 by normalizeBlockedKeywords
+			buildNodes[state].bestKeyword = int32(keywordIndex) //nolint:gosec // G115: keywordIndex is capped at maxContentModerationBlockedKeywords=10000 by normalizeBlockedKeywords
 		}
 	}
 
@@ -113,8 +113,8 @@ func newContentModerationKeywordMatcher(keywords []string) *contentModerationKey
 			}
 			outgoing[insertAt] = current
 		}
-		buildNodes[nodeIndex].edgeStart = uint32(len(edges))
-		buildNodes[nodeIndex].edgeCount = uint16(count)
+		buildNodes[nodeIndex].edgeStart = uint32(len(edges)) //nolint:gosec // G115: trie edge count is bounded by the same 10000x200 keyword limit, far under uint32
+		buildNodes[nodeIndex].edgeCount = uint16(count)      //nolint:gosec // G115: count is structurally capped at 256 by the fixed-size [256]contentModerationKeywordEdge array it's copied from
 		edges = append(edges, outgoing[:count]...)
 	}
 
@@ -134,7 +134,7 @@ func contentModerationKeywordBuildFirstEdge(node contentModerationKeywordNode) i
 	if node.edgeStart == 0 {
 		return -1
 	}
-	return int32(node.edgeStart - 1)
+	return int32(node.edgeStart - 1) //nolint:gosec // G115: guarded by an edgeStart==0 check immediately above; edgeStart itself is bounded to ~8M as established for the edge-count findings in this file
 }
 
 func contentModerationKeywordBuildTransition(

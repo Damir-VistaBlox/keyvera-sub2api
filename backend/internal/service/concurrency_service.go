@@ -196,7 +196,7 @@ func initRequestIDPrefix() string {
 	if _, err := rand.Read(b); err == nil {
 		return "r" + strconv.FormatUint(binary.BigEndian.Uint64(b), 36)
 	}
-	fallback := uint64(time.Now().UnixNano()) ^ (uint64(os.Getpid()) << 16)
+	fallback := uint64(time.Now().UnixNano()) ^ (uint64(os.Getpid()) << 16) //nolint:gosec // G115: UnixNano() is always positive on any real system clock; non-crypto fallback ID prefix only
 	return "r" + strconv.FormatUint(fallback, 36)
 }
 
@@ -680,8 +680,8 @@ func accountLoadBatchCacheKey(accounts []AccountWithConcurrency) string {
 	hash := sha256.New()
 	var buf [16]byte
 	for _, account := range accounts {
-		binary.LittleEndian.PutUint64(buf[:8], uint64(account.ID))
-		binary.LittleEndian.PutUint64(buf[8:], uint64(int64(account.MaxConcurrency)))
+		binary.LittleEndian.PutUint64(buf[:8], uint64(account.ID))                    //nolint:gosec // G115: account.ID is a small positive Ent bigserial; only feeds a local, short-lived cache-key hash
+		binary.LittleEndian.PutUint64(buf[8:], uint64(int64(account.MaxConcurrency))) //nolint:gosec // G115: MaxConcurrency is a small internal per-account limit; only feeds the same local cache-key hash
 		_, _ = hash.Write(buf[:])
 	}
 	sum := hash.Sum(nil)

@@ -48,15 +48,13 @@ linters:
         - G101
         - G103
         - G104
-        - G109
-        - G115
         - G301
         - G302
         - G304
         - G306
         - G404
       severity: high
-      confidence: high
+      confidence: low
     errcheck:
       # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
       # Such cases aren't reported by default.

@@ -3,6 +3,8 @@
 package antigravity
 
 import (
+	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -105,5 +107,38 @@ func TestGenerateRandomID_ConcurrentUniqueness(t *testing.T) {
 func BenchmarkGenerateRandomID(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = generateRandomID()
+	}
+}
+
+// generateRandomID's crypto/rand.Read call essentially never fails in a test
+// environment, so the above tests never exercise generateFallbackID. Test it
+// directly: a prior version indexed with a signed int(seed)%len(chars), which
+// is negative whenever the xorshift64 seed has its high bit set (~half of all
+// seeds) — chars[negative] panics. These seeds pin that failure mode.
+func TestGenerateFallbackID_NoPanicAcrossSignBoundarySeeds(t *testing.T) {
+	seeds := []uint64{
+		0,
+		1,
+		1 << 63,        // sign bit alone: int64 reinterpretation is negative
+		math.MaxUint64, // all bits set
+		math.MaxUint64 - 1,
+		uint64(1)<<63 + 1,
+	}
+	for _, seed := range seeds {
+		var id string
+		require.NotPanics(t, func() { id = generateFallbackID(seed) }, "seed=%d", seed)
+		require.Len(t, id, 12, "seed=%d", seed)
+		for j := 0; j < len(id); j++ {
+			require.True(t, strings.ContainsRune(randomIDChars, rune(id[j])), "seed=%d produced invalid char %q", seed, id[j])
+		}
+	}
+}
+
+func TestGenerateFallbackID_NoPanicRandomSeedSweep(t *testing.T) {
+	// Broad sweep in addition to the pinned boundary seeds above — xorshift64
+	// evolves the seed every iteration, so this also covers mid-sequence states.
+	for i := 0; i < 10000; i++ {
+		seed := uint64(i) * 0x9E3779B97F4A7C15 // spread across the full uint64 range
+		require.NotPanics(t, func() { generateFallbackID(seed) }, "seed=%d", seed)
 	}
 }

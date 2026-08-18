@@ -376,7 +376,7 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 		}
 		item.GroupName = groupName
 		if requestType.Valid {
-			v := int16(requestType.Int64)
+			v := int16(requestType.Int64) //nolint:gosec // G115: source column ops_error_logs.request_type is SMALLINT at the schema level (migrations/079)
 			item.RequestType = &v
 		}
 		item.APIKeyName = apiKeyName
@@ -584,7 +584,7 @@ LIMIT 1`
 		out.TimeToFirstTokenMs = &v
 	}
 	if requestType.Valid {
-		v := int16(requestType.Int64)
+		v := int16(requestType.Int64) //nolint:gosec // G115: source column ops_error_logs.request_type is SMALLINT at the schema level (migrations/079)
 		out.RequestType = &v
 	}
 	out.APIKeyName = detailAPIKeyName

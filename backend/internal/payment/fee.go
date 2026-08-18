@@ -10,7 +10,7 @@ func CalculatePayAmount(rechargeAmount float64, feeRate float64) string {
 
 // CalculatePayAmountForCurrency 按币种精度计算应付金额，手续费向上取整到该币种最小支付单位。
 func CalculatePayAmountForCurrency(rechargeAmount float64, feeRate float64, currency string) string {
-	fractionDigits := int32(CurrencyMaxFractionDigits(currency))
+	fractionDigits := int32(CurrencyMaxFractionDigits(currency)) //nolint:gosec // G115: CurrencyMaxFractionDigits is always one of 4 hardcoded package-level literals, value in {0,2,3}
 	amount := decimal.NewFromFloat(rechargeAmount)
 	if feeRate <= 0 {
 		return amount.StringFixed(fractionDigits)

@@ -2591,11 +2591,11 @@ func (c *Config) Validate() error {
 		if c.Server.H2C.MaxReadFrameSize < 16*1024 || c.Server.H2C.MaxReadFrameSize > 16*1024*1024-1 {
 			return fmt.Errorf("server.h2c.max_read_frame_size must be between 16384 and 16777215 bytes")
 		}
-		if c.Server.H2C.MaxUploadBufferPerConnection < 65535 {
-			return fmt.Errorf("server.h2c.max_upload_buffer_per_connection must be at least 65535 bytes")
+		if c.Server.H2C.MaxUploadBufferPerConnection < 65535 || c.Server.H2C.MaxUploadBufferPerConnection > math.MaxInt32 {
+			return fmt.Errorf("server.h2c.max_upload_buffer_per_connection must be between 65535 and %d bytes", math.MaxInt32)
 		}
-		if c.Server.H2C.MaxUploadBufferPerStream <= 0 {
-			return fmt.Errorf("server.h2c.max_upload_buffer_per_stream must be positive")
+		if c.Server.H2C.MaxUploadBufferPerStream <= 0 || c.Server.H2C.MaxUploadBufferPerStream > math.MaxInt32 {
+			return fmt.Errorf("server.h2c.max_upload_buffer_per_stream must be between 1 and %d bytes", math.MaxInt32)
 		}
 	}
 	if c.APIKeyAuth.InvalidAbuse.Enabled {

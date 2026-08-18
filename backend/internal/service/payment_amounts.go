@@ -36,7 +36,7 @@ func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, 
 	if orderAmount <= 0 || payAmount <= 0 || refundAmount <= 0 {
 		return 0
 	}
-	fractionDigits := int32(payment.CurrencyMaxFractionDigits(currency))
+	fractionDigits := int32(payment.CurrencyMaxFractionDigits(currency)) //nolint:gosec // G115: CurrencyMaxFractionDigits is always one of 4 hardcoded package-level literals, value in {0,2,3}
 	if math.Abs(refundAmount-orderAmount) <= paymentAmountToleranceForCurrency(currency) {
 		return decimal.NewFromFloat(payAmount).Round(fractionDigits).InexactFloat64()
 	}

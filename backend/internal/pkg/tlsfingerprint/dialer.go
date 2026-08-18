@@ -460,7 +460,7 @@ func buildClientHelloSpecFromProfile(profile *Profile) *utls.ClientHelloSpec {
 func toUint8s(vals []uint16) []uint8 {
 	out := make([]uint8, len(vals))
 	for i, v := range vals {
-		out[i] = uint8(v)
+		out[i] = uint8(v) //nolint:gosec // G115: callers must validate each element <= 255 before reaching here; see model.TLSFingerprintProfile.Validate
 	}
 	return out
 }

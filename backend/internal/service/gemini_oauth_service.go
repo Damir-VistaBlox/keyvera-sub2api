@@ -677,7 +677,7 @@ func (s *GeminiOAuthService) RefreshToken(ctx context.Context, oauthType, refres
 
 	for attempt := 0; attempt <= 3; attempt++ {
 		if attempt > 0 {
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second //nolint:gosec // G115: attempt is bounded by a hardcoded <=3 retry loop, only reached when attempt>0
 			if backoff > 30*time.Second {
 				backoff = 30 * time.Second
 			}

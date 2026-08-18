@@ -172,7 +172,7 @@ func (s *AntigravityOAuthService) RefreshToken(ctx context.Context, refreshToken
 
 	for attempt := 0; attempt <= 3; attempt++ {
 		if attempt > 0 {
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second //nolint:gosec // G115: attempt is bounded by a hardcoded <=3 retry loop, only reached when attempt>0
 			if backoff > 30*time.Second {
 				backoff = 30 * time.Second
 			}
@@ -340,7 +340,7 @@ func (s *AntigravityOAuthService) loadProjectIDWithRetry(ctx context.Context, ac
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second //nolint:gosec // G115: maxRetries is always passed as a hardcoded 3 at every call site
 			if backoff > 8*time.Second {
 				backoff = 8 * time.Second
 			}

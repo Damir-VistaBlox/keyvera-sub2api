@@ -608,10 +608,10 @@ func (c *OpsMetricsCollector) collectSystemStats(ctx context.Context) (*opsColle
 
 	cgroupUsed, cgroupTotal, cgroupOK := readCgroupMemoryBytes()
 	if cgroupOK {
-		usedMB := int64(cgroupUsed / bytesPerMB)
+		usedMB := int64(cgroupUsed / bytesPerMB) //nolint:gosec // G115: cgroup memory bytes are bounded by the host's actual physical/cgroup memory; dividing by 1MB first keeps the result far under int64's range
 		out.memoryUsedMB = &usedMB
 		if cgroupTotal > 0 {
-			totalMB := int64(cgroupTotal / bytesPerMB)
+			totalMB := int64(cgroupTotal / bytesPerMB) //nolint:gosec // G115: readCgroupMemoryBytes already guards the cgroup-v1 unlimited sentinel and the cgroup-v2 literal "max" string before this is reached
 			out.memoryTotalMB = &totalMB
 			pct := roundTo1DP(float64(cgroupUsed) / float64(cgroupTotal) * 100)
 			out.memoryUsagePercent = &pct
@@ -630,11 +630,11 @@ func (c *OpsMetricsCollector) collectSystemStats(ctx context.Context) (*opsColle
 	if out.memoryUsedMB == nil || out.memoryTotalMB == nil || out.memoryUsagePercent == nil {
 		if vm, err := mem.VirtualMemoryWithContext(ctx); err == nil && vm != nil {
 			if out.memoryUsedMB == nil {
-				usedMB := int64(vm.Used / bytesPerMB)
+				usedMB := int64(vm.Used / bytesPerMB) //nolint:gosec // G115: gopsutil VirtualMemoryStat.Used is bounded by actual host RAM, physically far below int64's range after MB conversion
 				out.memoryUsedMB = &usedMB
 			}
 			if out.memoryTotalMB == nil {
-				totalMB := int64(vm.Total / bytesPerMB)
+				totalMB := int64(vm.Total / bytesPerMB) //nolint:gosec // G115: gopsutil VirtualMemoryStat.Total is bounded by actual host RAM, physically far below int64's range after MB conversion
 				out.memoryTotalMB = &totalMB
 			}
 			if out.memoryUsagePercent == nil {

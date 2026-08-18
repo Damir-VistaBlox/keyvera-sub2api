@@ -368,7 +368,7 @@ func (s *ChannelMonitorV2Aggregator) recordBackfillFailure(now, end time.Time) {
 		s.backfillChunk = maxChunk
 	}
 	// Exponential backoff on wait floor: 1m, 2m, 4m… capped at 10m.
-	floor := time.Minute << uint(s.backfillFailures-1)
+	floor := time.Minute << uint(s.backfillFailures-1) //nolint:gosec // G115: backfillFailures is incremented immediately before use under the same mutex, always >=1; the following min/max clamps absorb any pathological value
 	if floor > channelMonitorV2MaxBackoff {
 		floor = channelMonitorV2MaxBackoff
 	}

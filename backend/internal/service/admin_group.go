@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -1113,8 +1114,8 @@ func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupI
 		return nil
 	}
 	for _, e := range entries {
-		if e.RPMOverride != nil && *e.RPMOverride < 0 {
-			return infraerrors.BadRequest("INVALID_RPM_OVERRIDE", fmt.Sprintf("rpm_override must be >= 0 (user_id=%d)", e.UserID))
+		if e.RPMOverride != nil && (*e.RPMOverride < 0 || *e.RPMOverride > math.MaxInt32) {
+			return infraerrors.BadRequest("INVALID_RPM_OVERRIDE", fmt.Sprintf("rpm_override must be between 0 and %d (user_id=%d)", math.MaxInt32, e.UserID))
 		}
 	}
 	if err := s.userGroupRateRepo.SyncGroupRPMOverrides(ctx, groupID, entries); err != nil {

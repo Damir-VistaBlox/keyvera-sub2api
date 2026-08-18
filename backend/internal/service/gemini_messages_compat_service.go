@@ -1729,7 +1729,7 @@ func (s *GeminiMessagesCompatService) poolModeSkippedFailoverError(c *gin.Contex
 }
 
 func sleepGeminiBackoff(attempt int) {
-	delay := geminiRetryBaseDelay * time.Duration(1<<uint(attempt-1))
+	delay := geminiRetryBaseDelay * time.Duration(1<<uint(attempt-1)) //nolint:gosec // G115: attempt is bounded by a hardcoded geminiMaxRetries=5 loop
 	if delay > geminiRetryMaxDelay {
 		delay = geminiRetryMaxDelay
 	}

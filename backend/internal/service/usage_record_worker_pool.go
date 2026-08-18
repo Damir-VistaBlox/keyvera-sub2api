@@ -258,7 +258,7 @@ func (p *UsageRecordWorkerPool) autoScaleTick() {
 		return
 	}
 	current := p.pool.MaxConcurrency()
-	waiting := int(p.pool.WaitingTasks())
+	waiting := int(p.pool.WaitingTasks()) //nolint:gosec // G115: waiting is bounded by a fixed pond.WithQueueSize, an operator-configured value, not attacker-controlled
 	running := int(p.pool.RunningWorkers())
 	if current <= 0 || waiting < 0 {
 		return
@@ -321,7 +321,7 @@ func (p *UsageRecordWorkerPool) shouldSyncFallback() bool {
 		return false
 	}
 	n := p.overflowCounter.Add(1)
-	return int((n-1)%100) < p.overflowSamplePercent
+	return int((n-1)%100) < p.overflowSamplePercent //nolint:gosec // G115: (n-1)%100 is always in [0,99] regardless of the atomic counter n's magnitude
 }
 
 func (p *UsageRecordWorkerPool) execute(task UsageRecordTask) {

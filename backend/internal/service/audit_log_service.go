@@ -146,7 +146,7 @@ func (s *AuditLogService) runWriter() {
 			_, _ = fmt.Fprintf(os.Stderr, "time=%s level=WARN msg=\"audit log flush failed\" err=%v batch=%d\n",
 				time.Now().Format(time.RFC3339Nano), err, len(batch))
 		} else {
-			atomic.AddUint64(&s.writtenCount, uint64(inserted))
+			atomic.AddUint64(&s.writtenCount, uint64(inserted)) //nolint:gosec // G115: inserted is in [0,len(batch)], and batch is capped at auditLogBatchSize=100
 		}
 		batch = batch[:0]
 	}

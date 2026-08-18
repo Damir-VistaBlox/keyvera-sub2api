@@ -2281,7 +2281,7 @@ func (s *ContentModerationService) nextUsableAPIKey(cfg *ContentModerationConfig
 	}
 	now := time.Now()
 	for i := 0; i < len(keys); i++ {
-		idx := int(s.apiKeyCursor.Add(1)-1) % len(keys)
+		idx := int(s.apiKeyCursor.Add(1)-1) % len(keys) //nolint:gosec // G115: atomic round-robin cursor starting at 0, incremented by 1 per call; would take ~2^63 requests to go negative
 		key := keys[idx]
 		if !s.isAPIKeyFrozen(key, now) {
 			return key, true
