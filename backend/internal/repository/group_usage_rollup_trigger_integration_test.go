@@ -157,6 +157,7 @@ func TestGroupUsageRollupTriggerSerializesInsertTransactionAcrossMidnight(t *tes
 	insertResult := make(chan error, 1)
 	go func() {
 		_, insertErr := insertTx.ExecContext(ctx, `
+			SET LOCAL TIME ZONE 'Asia/Shanghai';
 			INSERT INTO usage_logs (id, user_id, group_id, actual_cost, created_at)
 			VALUES (1, 1, 10, 1.25, CURRENT_TIMESTAMP)
 		`)
@@ -207,6 +208,7 @@ func TestGroupUsageRollupTriggerKeepsWatermarkForTodayInsert(t *testing.T) {
 	tx := beginGroupUsageRollupTriggerTestTx(t, ctx, schema)
 	defer func() { _ = tx.Rollback() }()
 	_, err := tx.ExecContext(ctx, `
+		SET LOCAL TIME ZONE 'Asia/Shanghai';
 		INSERT INTO groups (id) VALUES (10);
 		INSERT INTO users (id) VALUES (1);
 		UPDATE usage_group_rollup_state
