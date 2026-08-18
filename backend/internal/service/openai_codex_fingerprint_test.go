@@ -493,7 +493,33 @@ func rawVsMapClientMetadata(t *testing.T, body []byte, ids *codexFingerprintIDs)
 	var rawDecoded map[string]any
 	require.NoError(t, json.Unmarshal(rawBody, &rawDecoded))
 	rawCM, _ := rawDecoded["client_metadata"].(map[string]any)
+
+	// The map and raw paths each independently call
+	// applyCodexFingerprintToClientMetadataMap, which stamps
+	// turn_started_at_unix_ms with its own time.Now() call. The two calls
+	// happen microseconds apart but can legitimately land in different
+	// milliseconds, which isn't what this test verifies -- normalize it out
+	// of both sides before the equality check below.
+	normalizeTurnStartedAt(t, mapCM)
+	normalizeTurnStartedAt(t, rawCM)
 	return mapCM, rawCM
+}
+
+func normalizeTurnStartedAt(t *testing.T, clientMetadata map[string]any) {
+	t.Helper()
+	raw, ok := clientMetadata["x-codex-turn-metadata"].(string)
+	if !ok {
+		return
+	}
+	var turnMetadata map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &turnMetadata))
+	if _, ok := turnMetadata["turn_started_at_unix_ms"]; !ok {
+		return
+	}
+	turnMetadata["turn_started_at_unix_ms"] = "normalized"
+	rebuilt, err := json.Marshal(turnMetadata)
+	require.NoError(t, err)
+	clientMetadata["x-codex-turn-metadata"] = string(rebuilt)
 }
 
 func TestApplyCodexFingerprintClientMetadataRaw_MatchesMapVariant(t *testing.T) {

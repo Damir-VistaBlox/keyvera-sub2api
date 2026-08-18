@@ -259,6 +259,7 @@ import {
   loadOAuthAffiliateCode,
   oauthAffiliatePayload
 } from '@/utils/oauthAffiliate'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const route = useRoute()
 const router = useRouter()
@@ -541,7 +542,7 @@ function switchToCreateAccountMode() {
 
 function getRequestErrorMessage(error: unknown, fallback: string): string {
   const err = error as { message?: string; response?: { data?: { detail?: string; message?: string } } }
-  return err.response?.data?.detail || err.response?.data?.message || err.message || fallback
+  return extractApiErrorMessage(err, fallback)
 }
 
 function isCreateAccountRecoveryError(error: unknown): boolean {
@@ -654,7 +655,7 @@ async function handleSubmitInvitation() {
   } catch (e: unknown) {
     const err = e as { message?: string; response?: { data?: { message?: string } } }
     invitationError.value =
-      err.response?.data?.message || err.message || t('auth.dingtalk.completeRegistrationFailed')
+      extractApiErrorMessage(err, t('auth.dingtalk.completeRegistrationFailed'))
   } finally {
     isSubmitting.value = false
   }

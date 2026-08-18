@@ -279,6 +279,7 @@ import Icon from '@/components/icons/Icon.vue'
 import AnnouncementTargetingEditor from '@/components/admin/announcements/AnnouncementTargetingEditor.vue'
 import AnnouncementReadStatusDialog from '@/components/admin/announcements/AnnouncementReadStatusDialog.vue'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -379,7 +380,7 @@ async function loadAnnouncements() {
       return
     }
     console.error('Error loading announcements:', error)
-    appStore.showError(error.response?.data?.detail || t('admin.announcements.failedToLoad'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.announcements.failedToLoad')))
   } finally {
     if (currentController === requestController) {
       loading.value = false
@@ -595,7 +596,7 @@ async function confirmDelete() {
     await loadAnnouncements()
   } catch (error: any) {
     console.error('Failed to delete announcement:', error)
-    appStore.showError(error.response?.data?.detail || t('admin.announcements.failedToDelete'))
+    appStore.showError(extractApiErrorMessage(error, t('admin.announcements.failedToDelete')))
   }
 }
 

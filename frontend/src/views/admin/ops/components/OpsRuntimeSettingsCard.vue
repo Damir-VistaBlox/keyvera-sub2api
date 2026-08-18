@@ -5,6 +5,7 @@ import { useAppStore } from '@/stores/app'
 import { opsAPI } from '@/api/admin/ops'
 import type { OpsAlertRuntimeSettings } from '../types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -134,7 +135,7 @@ async function loadSettings() {
     alertSettings.value = await opsAPI.getAlertRuntimeSettings()
   } catch (err: any) {
     console.error('[OpsRuntimeSettingsCard] Failed to load runtime settings', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.runtime.loadFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.runtime.loadFailed')))
   } finally {
     loading.value = false
   }
@@ -225,7 +226,7 @@ async function saveAlertSettings() {
     appStore.showSuccess(t('admin.ops.runtime.saveSuccess'))
   } catch (err: any) {
     console.error('[OpsRuntimeSettingsCard] Failed to save alert runtime settings', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.runtime.saveFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.runtime.saveFailed')))
   } finally {
     saving.value = false
   }

@@ -7,6 +7,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import type { OpsAlertRuntimeSettings, EmailNotificationConfig, AlertSeverity, OpsAdvancedSettings, OpsMetricThresholds } from '../types'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -65,7 +66,7 @@ async function loadAllSettings() {
     }
   } catch (err: any) {
     console.error('[OpsSettingsDialog] Failed to load settings', err)
-    appStore.showError(err?.response?.data?.detail || t('admin.ops.settings.loadFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.settings.loadFailed')))
   } finally {
     loading.value = false
   }
@@ -224,7 +225,7 @@ async function saveAllSettings() {
     emit('close')
   } catch (err: any) {
     console.error('[OpsSettingsDialog] Failed to save settings', err)
-    appStore.showError(err?.response?.data?.message || err?.response?.data?.detail || t('admin.ops.settings.saveFailed'))
+    appStore.showError(extractApiErrorMessage(err, t('admin.ops.settings.saveFailed')))
   } finally {
     saving.value = false
   }
