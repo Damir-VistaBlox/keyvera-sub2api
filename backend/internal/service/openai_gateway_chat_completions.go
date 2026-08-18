@@ -905,6 +905,11 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.L().Error("handleChatStreamingResponse: panic in SSE reader goroutine", zap.Any("panic", r))
+			}
+		}()
 		defer close(events)
 		for scanner.Scan() {
 			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())

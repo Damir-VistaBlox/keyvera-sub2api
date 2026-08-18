@@ -163,6 +163,11 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func(scanBuf *sseScannerBuf64K) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
+			}
+		}()
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		for scanner.Scan() {
@@ -360,6 +365,11 @@ func (s *AntigravityGatewayService) handleGeminiStreamToNonStreaming(c *gin.Cont
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func(scanBuf *sseScannerBuf64K) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
+			}
+		}()
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		for scanner.Scan() {
@@ -831,6 +841,11 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func(scanBuf *sseScannerBuf64K) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
+			}
+		}()
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		for scanner.Scan() {
@@ -1055,6 +1070,11 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func(scanBuf *sseScannerBuf64K) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LegacyPrintf("service.antigravity_gateway", "ALERT: panic in SSE reader goroutine: %v", r)
+			}
+		}()
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		for scanner.Scan() {
