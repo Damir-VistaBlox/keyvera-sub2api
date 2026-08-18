@@ -725,6 +725,15 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 	resetTimeout()
 	defer stopTimeout()
 
+	// Deliberately not using the shared startSSEReader helper (see
+	// sse_reader.go): this function buffers the whole upstream response
+	// internally and never writes to the client (see its call sites --
+	// "openai messages buffered" / "openai chat_completions buffered"), so
+	// it has no live connection to keep alive and no need for the
+	// lastReadAt/keepalive-timer tracking the helper's other callers rely
+	// on. Its own resetTimeout/stopTimeout above serves a different purpose
+	// (aborting a hung upstream read), not a worse version of the same
+	// thing.
 	type scanEvent struct {
 		line string
 		err  error
@@ -1135,35 +1144,15 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		line string
 		err  error
 	}
-	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
 	var lastReadAt int64
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-	sendEvent := func(ev scanEvent) bool {
-		select {
-		case events <- ev:
-			return true
-		case <-done:
-			return false
-		}
-	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.L().Error("handleAnthropicStreamingResponse: panic in SSE reader goroutine", zap.Any("panic", r))
-			}
-		}()
-		defer close(events)
-		for scanner.Scan() {
-			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
-			if !sendEvent(scanEvent{line: scanner.Text()}) {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			_ = sendEvent(scanEvent{err: err})
-		}
-	}()
+	events := startSSEReader(scanner, nil, done,
+		func(string) { atomic.StoreInt64(&lastReadAt, time.Now().UnixNano()) },
+		func(line string) scanEvent { return scanEvent{line: line} },
+		func(err error) scanEvent { return scanEvent{err: err} },
+		"service.openai_gateway", "handleAnthropicStreamingResponse",
+	)
 	defer close(done)
 
 	var keepaliveTicker *time.Ticker

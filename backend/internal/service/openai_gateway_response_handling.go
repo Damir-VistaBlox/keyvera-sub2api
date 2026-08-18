@@ -660,6 +660,11 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		return finalizeStream()
 	}
 
+	// Deliberately not using the shared startSSEReader helper (see
+	// sse_reader.go): sendEvent below has a conditional synchronous
+	// backpressure contract (ev.processed) and a dynamically-sized channel
+	// buffer tied to guardFirstOutput's memory-bounding strategy that the
+	// generic helper doesn't support. This is purpose-built, not drift.
 	type scanEvent struct {
 		line      string
 		err       error
