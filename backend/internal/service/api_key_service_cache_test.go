@@ -93,6 +93,10 @@ func (s *authRepoStub) CountByGroupID(ctx context.Context, groupID int64) (int64
 	panic("unexpected CountByGroupID call")
 }
 
+func (s *authRepoStub) CountActiveByGroupID(ctx context.Context, groupID int64) (int64, error) {
+	panic("unexpected CountActiveByGroupID call")
+}
+
 func (s *authRepoStub) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
 	if s.listKeysByUserID == nil {
 		panic("unexpected ListKeysByUserID call")

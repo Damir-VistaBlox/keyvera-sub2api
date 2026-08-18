@@ -527,3 +527,49 @@ func (s *RedeemCodeRepoSuite) TestCreateBatch_Filters_Use_Idempotency_ListByUser
 	s.Require().Len(used, 2, "expected 2 used codes")
 	s.Require().Equal("CODEA", used[0].Code, "expected newest used code first")
 }
+
+func (s *RedeemCodeRepoSuite) TestGetStats() {
+	past := time.Now().UTC().Add(-time.Hour)
+	future := time.Now().UTC().Add(time.Hour)
+
+	// Active: unused, not expired (nil expiry or in the future).
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-ACTIVE-1", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusUnused,
+	}))
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-ACTIVE-2", Type: service.RedeemTypeConcurrency, Value: 0, Status: service.StatusUnused, ExpiresAt: &future,
+	}))
+
+	// Expired via explicit status.
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-EXPIRED-STATUS", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusExpired,
+	}))
+	// Expired lazily: still status=unused but past its expires_at (mirrors
+	// service.RedeemCode.IsExpiredAt and ListWithFilters' StatusExpired case).
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-EXPIRED-LAZY", Type: service.RedeemTypeSubscription, Value: 0, Status: service.StatusUnused, ExpiresAt: &past,
+	}))
+
+	// Used, with values that must sum into total_value_distributed.
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-USED-1", Type: service.RedeemTypeBalance, Value: 30, Status: service.StatusUsed,
+	}))
+	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{
+		Code: "STATS-USED-2", Type: service.RedeemTypeInvitation, Value: 12.5, Status: service.StatusUsed,
+	}))
+
+	stats, err := s.repo.GetStats(s.ctx)
+	s.Require().NoError(err, "GetStats")
+
+	s.Require().Equal(int64(6), stats.TotalCodes)
+	s.Require().Equal(int64(2), stats.ActiveCodes)
+	s.Require().Equal(int64(2), stats.UsedCodes)
+	s.Require().Equal(int64(2), stats.ExpiredCodes, "status=expired and lazily-expired unused codes both count")
+	s.Require().InDelta(42.5, stats.TotalValueDistributed, 0.0001)
+	s.Require().Equal(map[string]int64{
+		service.RedeemTypeBalance:      3, // STATS-ACTIVE-1 + STATS-EXPIRED-STATUS + STATS-USED-1
+		service.RedeemTypeConcurrency:  1,
+		service.RedeemTypeSubscription: 1,
+		service.RedeemTypeInvitation:   1,
+	}, stats.ByType)
+}

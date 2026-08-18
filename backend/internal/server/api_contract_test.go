@@ -2187,6 +2187,10 @@ func (stubRedeemCodeRepo) SumPositiveBalanceByUser(ctx context.Context, userID i
 	return 0, errors.New("not implemented")
 }
 
+func (stubRedeemCodeRepo) GetStats(ctx context.Context) (*service.RedeemCodeStats, error) {
+	return nil, errors.New("not implemented")
+}
+
 type stubUserSubscriptionRepo struct {
 	byUser       map[int64][]service.UserSubscription
 	activeByUser map[int64][]service.UserSubscription
@@ -2495,6 +2499,10 @@ func (r *stubApiKeyRepo) UpdateGroupIDByUserAndGroup(ctx context.Context, userID
 }
 
 func (r *stubApiKeyRepo) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (r *stubApiKeyRepo) CountActiveByGroupID(ctx context.Context, groupID int64) (int64, error) {
 	return 0, errors.New("not implemented")
 }
 

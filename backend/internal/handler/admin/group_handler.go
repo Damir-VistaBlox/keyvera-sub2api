@@ -724,14 +724,24 @@ func (h *GroupHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	// Return mock data for now
+	totalAPIKeys, activeAPIKeys, err := h.adminService.GetGroupAPIKeyStats(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	totalRequests, totalCost, err := h.dashboardService.GetGroupUsageTotals(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
 	response.Success(c, gin.H{
-		"total_api_keys":  0,
-		"active_api_keys": 0,
-		"total_requests":  0,
-		"total_cost":      0.0,
+		"total_api_keys":  totalAPIKeys,
+		"active_api_keys": activeAPIKeys,
+		"total_requests":  totalRequests,
+		"total_cost":      totalCost,
 	})
-	_ = groupID // TODO: implement actual stats
 }
 
 // GetUsageSummary returns today's, yesterday's, and cumulative cost for all groups.

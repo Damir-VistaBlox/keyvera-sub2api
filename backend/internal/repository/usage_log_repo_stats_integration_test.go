@@ -114,3 +114,45 @@ func TestUsageLog_GetStatsWithFilters_AggregatesAndEndpoints(t *testing.T) {
 	require.NotEmpty(t, stats.UpstreamEndpoints)
 	require.NotEmpty(t, stats.EndpointPaths)
 }
+
+// TestUsageLog_GetGroupStatsWithFilters_SingleGroup verifies the query
+// GroupHandler.GetStats' DashboardService.GetGroupUsageTotals relies on:
+// filtering to one groupID must return exactly that group's request count
+// and total_cost, unaffected by other groups' usage in the same time range.
+func TestUsageLog_GetGroupStatsWithFilters_SingleGroup(t *testing.T) {
+	ctx := context.Background()
+	tx := testEntTx(t)
+	client := tx.Client()
+	repo := newUsageLogRepositoryWithSQL(client, tx)
+
+	user := mustCreateUser(t, client, &service.User{Email: "group-stats@test.com"})
+	apiKey := mustCreateApiKey(t, client, &service.APIKey{UserID: user.ID, Key: "sk-group-stats", Name: "group-stats"})
+	account := mustCreateAccount(t, client, &service.Account{Name: "group-stats-account"})
+	groupA := mustCreateGroup(t, client, &service.Group{Name: "group-stats-a"})
+	groupB := mustCreateGroup(t, client, &service.Group{Name: "group-stats-b"})
+	now := time.Now().UTC()
+
+	for _, cost := range []float64{1.5, 2.5} {
+		_, err := repo.Create(ctx, &service.UsageLog{
+			UserID: user.ID, APIKeyID: apiKey.ID, AccountID: account.ID,
+			GroupID: &groupA.ID, Model: "gpt-5.5", InputTokens: 1, OutputTokens: 1,
+			TotalCost: cost, CreatedAt: now,
+		})
+		require.NoError(t, err)
+	}
+	_, err := repo.Create(ctx, &service.UsageLog{
+		UserID: user.ID, APIKeyID: apiKey.ID, AccountID: account.ID,
+		GroupID: &groupB.ID, Model: "gpt-5.5", InputTokens: 1, OutputTokens: 1,
+		TotalCost: 100, CreatedAt: now,
+	})
+	require.NoError(t, err)
+
+	start := now.Add(-time.Hour)
+	end := now.Add(time.Hour)
+	results, err := repo.GetGroupStatsWithFilters(ctx, start, end, 0, 0, 0, groupA.ID, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, groupA.ID, results[0].GroupID)
+	require.Equal(t, int64(2), results[0].Requests)
+	require.InDelta(t, 4.0, results[0].Cost, 1e-9)
+}

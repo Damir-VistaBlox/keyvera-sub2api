@@ -2,24 +2,52 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
+
+// nilUsageLogRepo backs a minimal DashboardService so GroupHandler.GetStats
+// (which calls dashboardService.GetGroupUsageTotals) doesn't need a nil
+// receiver in this router-smoke-test harness.
+type nilUsageLogRepo struct {
+	service.UsageLogRepository
+}
+
+func (nilUsageLogRepo) GetGroupStatsWithFilters(context.Context, time.Time, time.Time, int64, int64, int64, int64, *int16, *bool, *int8) ([]usagestats.GroupStat, error) {
+	return nil, nil
+}
+
+// nilRedeemCodeRepo backs a minimal RedeemService so RedeemHandler.GetStats
+// doesn't need a nil receiver in this router-smoke-test harness.
+type nilRedeemCodeRepo struct {
+	service.RedeemCodeRepository
+}
+
+func (nilRedeemCodeRepo) GetStats(context.Context) (*service.RedeemCodeStats, error) {
+	return &service.RedeemCodeStats{ByType: map[string]int64{}}, nil
+}
 
 func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	adminSvc := newStubAdminService()
+	dashboardSvc := service.NewDashboardService(nilUsageLogRepo{}, nil, nil, nil)
+	redeemSvc := service.NewRedeemService(nilRedeemCodeRepo{}, nil, nil, nil, nil, nil, nil, nil)
 
 	userHandler := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil)
-	groupHandler := NewGroupHandler(adminSvc, nil, nil)
+	groupHandler := NewGroupHandler(adminSvc, dashboardSvc, nil)
 	proxyHandler := NewProxyHandler(adminSvc)
-	redeemHandler := NewRedeemHandler(adminSvc, nil)
+	redeemHandler := NewRedeemHandler(adminSvc, redeemSvc)
 
 	router.GET("/api/v1/admin/users", userHandler.List)
 	router.GET("/api/v1/admin/users/:id", userHandler.GetByID)
