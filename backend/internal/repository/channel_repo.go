@@ -202,7 +202,7 @@ func (r *channelRepository) List(ctx context.Context, params pagination.Paginati
 
 	// 计数
 	var total int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM channels c WHERE %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM channels c WHERE %s", whereClause) //nolint:gosec // G201: whereClause is joined from fixed "$N"-placeholder fragments above; every value is bound via args, never interpolated
 	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, nil, fmt.Errorf("count channels: %w", err)
 	}
@@ -215,7 +215,7 @@ func (r *channelRepository) List(ctx context.Context, params pagination.Paginati
 	offset := (page - 1) * pageSize
 
 	// 查询 channel 列表
-	dataQuery := fmt.Sprintf(
+	dataQuery := fmt.Sprintf( //nolint:gosec // G201: whereClause is "$N"-parameterized above; channelListOrderBy returns only a fixed switch-allowlisted column+direction pair, never raw input
 		`SELECT c.id, c.name, c.description, c.status, c.model_mapping, c.billing_model_source, c.restrict_models, c.features, c.features_config, c.apply_pricing_to_account_stats, c.created_at, c.updated_at
 		 FROM channels c WHERE %s ORDER BY %s LIMIT $%d OFFSET $%d`,
 		whereClause, channelListOrderBy(params), argIdx, argIdx+1,

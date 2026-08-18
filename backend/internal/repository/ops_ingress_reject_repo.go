@@ -125,6 +125,7 @@ func (r *opsRepository) ListIngressRejects(ctx context.Context, filter *service.
 		return nil, err
 	}
 	args = append(args, pageSize, (page-1)*pageSize)
+	//nolint:gosec // G201: where is built by add() above from fixed "$N"-placeholder literals only; every filter value is bound via args
 	query := fmt.Sprintf(`SELECT id,bucket_start,reject_reason,route_family,protocol,host(client_ip),user_id,api_key_id,request_count,first_seen,last_seen
 FROM ops_ingress_reject_aggregates %s ORDER BY bucket_start DESC,id DESC LIMIT $%d OFFSET $%d`, where, len(args)-1, len(args))
 	rows, err := r.db.QueryContext(ctx, query, args...)

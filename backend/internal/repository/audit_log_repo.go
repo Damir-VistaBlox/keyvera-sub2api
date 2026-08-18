@@ -262,6 +262,7 @@ func (r *auditLogRepository) List(ctx context.Context, filter *service.AuditLogF
 
 	offset := (page - 1) * pageSize
 	argsWithLimit := append(args, pageSize, offset)
+	//nolint:gosec // G202: auditLogSelectColumns is a package-level literal column list; where comes from buildAuditLogsWhere, which emits fixed "$N"-placeholder clauses with every value bound via args
 	query := "SELECT" + auditLogSelectColumns + "\nFROM audit_logs l\n" + where + `
 ORDER BY l.created_at DESC, l.id DESC
 LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)

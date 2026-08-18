@@ -135,7 +135,7 @@ WITH combined AS (
 )
 `
 
-	countQuery := fmt.Sprintf(`%s SELECT COUNT(1) FROM combined %s`, cte, where)
+	countQuery := fmt.Sprintf(`%s SELECT COUNT(1) FROM combined %s`, cte, where) //nolint:gosec // G201: cte is a fixed literal (only $1/$2 placeholders); where is built from addCondition, which emits fixed "$N"-placeholder clauses with every value bound via args
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		if err == sql.ErrNoRows {
@@ -157,6 +157,7 @@ WITH combined AS (
 		}
 	}
 
+	//nolint:gosec // G201: cte/where are $N-parameterized as above; sort is a strict switch that errors on any unrecognized value, so it can only ever be one of 2 hardcoded literals
 	listQuery := fmt.Sprintf(`
 %s
 SELECT

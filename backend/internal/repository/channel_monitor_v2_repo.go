@@ -125,6 +125,7 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 	// group allow-list, display-model collapse) still applies.
 	catalogFilter := channelMonitorV2CatalogFilter(channelMonitorV2CommonCoverageFilter(filter, *coverage))
 	where, args, _ := channelMonitorV2WhereWithRollup(catalogFilter, cfg, "m")
+	//nolint:gosec // G202: channelMonitorV2MetricsTable returns one of 2 fixed literals; where is $N-parameterized by channelMonitorV2WhereWithRollup, called here with the literal alias "m"
 	query := `SELECT m.platform, COALESCE(g.name, ''), lower(COALESCE(NULLIF(TRIM(g.platform), ''), 'unknown')), m.group_id, m.model,
 	                 SUM(m.success_requests + m.error_requests)
 	          FROM ` + channelMonitorV2MetricsTable(catalogFilter) + ` m
@@ -642,7 +643,7 @@ func (r *channelMonitorV2Repository) GetErrors(ctx context.Context, filter servi
 	}
 	filter = channelMonitorV2CommonCoverageFilter(filter, *coverage)
 	where, args, _ := channelMonitorV2WhereWithRollup(filter, cfg, "e")
-	rows, err := r.db.QueryContext(ctx, `SELECT e.platform,e.model,e.error_category,SUM(e.error_requests) FROM `+channelMonitorV2ErrorMetricsTable(filter)+` e `+where+` AND e.taxonomy_version = `+fmt.Sprint(service.ChannelMonitorV2TaxonomyVersion)+` GROUP BY e.platform,e.model,e.error_category`, args...)
+	rows, err := r.db.QueryContext(ctx, `SELECT e.platform,e.model,e.error_category,SUM(e.error_requests) FROM `+channelMonitorV2ErrorMetricsTable(filter)+` e `+where+` AND e.taxonomy_version = `+fmt.Sprint(service.ChannelMonitorV2TaxonomyVersion)+` GROUP BY e.platform,e.model,e.error_category`, args...) //nolint:gosec // G202: channelMonitorV2ErrorMetricsTable returns a fixed literal; where is $N-parameterized (alias "e"); TaxonomyVersion is a compile-time const
 	if err != nil {
 		return nil, err
 	}
@@ -739,6 +740,7 @@ func (r *channelMonitorV2Repository) loadErrorDetails(ctx context.Context, filte
 		args = append(args, pq.Array(groups))
 		conditions = append(conditions, fmt.Sprintf("COALESCE(current_error.group_id, 0) = ANY($%d)", len(args)))
 	}
+	//nolint:gosec // G202: conditions is built above from fixed literals plus "$N"-only fmt.Sprintf entries; every filter value is bound via args
 	query := `SELECT
 			lower(COALESCE(NULLIF(TRIM(current_error.platform), ''), 'unknown')) AS platform,
 			COALESCE(current_error.group_id, 0) AS group_id,
@@ -822,6 +824,7 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 	effectiveFilter := channelMonitorV2CommonCoverageFilter(filter, *coverage)
 	filter = effectiveFilter
 	where, args, _ := channelMonitorV2WhereWithRollup(filter, cfg, "m")
+	//nolint:gosec // G202: channelMonitorV2UserMetricsTable returns one of 2 fixed literals; where is $N-parameterized (alias "m")
 	query := `SELECT m.user_id,COALESCE(u.email,''),COALESCE(u.username,''),m.platform,m.model,
 	SUM(m.success_requests),SUM(m.error_requests),SUM(m.input_tokens),SUM(m.output_tokens),SUM(m.cache_creation_tokens),SUM(m.cache_read_tokens),SUM(m.ttft_sum_ms),SUM(m.ttft_count),SUM(m.duration_sum_ms),SUM(m.duration_count)
 	FROM ` + channelMonitorV2UserMetricsTable(filter) + ` m LEFT JOIN users u ON u.id=m.user_id ` + where + ` GROUP BY m.user_id,u.email,u.username,m.platform,m.model`
@@ -917,7 +920,7 @@ func (r *channelMonitorV2Repository) loadFacts(ctx context.Context, filter servi
 			group = bucketExpr + "," + group
 		}
 	}
-	query := `SELECT ` + bucketExpr + `,m.platform,m.group_id,COALESCE(g.name,''),m.model,SUM(m.success_requests),SUM(m.error_requests),SUM(m.upstream_affected_requests),SUM(m.upstream_attempt_count),SUM(m.input_tokens),SUM(m.output_tokens),SUM(m.cache_creation_tokens),SUM(m.cache_read_tokens),SUM(m.ttft_sum_ms),SUM(m.ttft_count),SUM(m.duration_sum_ms),SUM(m.duration_count) FROM ` + channelMonitorV2MetricsTable(filter) + ` m LEFT JOIN groups g ON g.id=NULLIF(m.group_id,0) ` + where + ` GROUP BY ` + group
+	query := `SELECT ` + bucketExpr + `,m.platform,m.group_id,COALESCE(g.name,''),m.model,SUM(m.success_requests),SUM(m.error_requests),SUM(m.upstream_affected_requests),SUM(m.upstream_attempt_count),SUM(m.input_tokens),SUM(m.output_tokens),SUM(m.cache_creation_tokens),SUM(m.cache_read_tokens),SUM(m.ttft_sum_ms),SUM(m.ttft_count),SUM(m.duration_sum_ms),SUM(m.duration_count) FROM ` + channelMonitorV2MetricsTable(filter) + ` m LEFT JOIN groups g ON g.id=NULLIF(m.group_id,0) ` + where + ` GROUP BY ` + group //nolint:gosec // G202: bucketExpr/group are each one of 3 fixed literals chosen by byBucket/bucketSeconds; channelMonitorV2MetricsTable returns a fixed literal; where is $N-parameterized (alias "m")
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -959,7 +962,7 @@ func (r *channelMonitorV2Repository) loadHistograms(ctx context.Context, filter 
 			group = bucketExpr + "," + group
 		}
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT `+bucketExpr+`,h.platform,h.group_id,h.model,h.user_id,h.metric,h.upper_bound_ms,SUM(h.sample_count) FROM `+channelMonitorV2HistogramTable(filter)+` h `+where+` GROUP BY `+group, args...)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+bucketExpr+`,h.platform,h.group_id,h.model,h.user_id,h.metric,h.upper_bound_ms,SUM(h.sample_count) FROM `+channelMonitorV2HistogramTable(filter)+` h `+where+` GROUP BY `+group, args...) //nolint:gosec // G202: bucketExpr/group are each one of 3 fixed literals; channelMonitorV2HistogramTable returns a fixed literal; where is $N-parameterized (alias "h")
 	if err != nil {
 		return nil, err
 	}

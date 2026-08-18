@@ -26,6 +26,7 @@ func (r *opsRepository) GetLatencyHistogram(ctx context.Context, filter *service
 	rangeExpr := latencyHistogramRangeCaseExpr("ul.duration_ms")
 	orderExpr := latencyHistogramRangeOrderCaseExpr("ul.duration_ms")
 
+	//nolint:gosec // G202: rangeExpr/orderExpr are built from a fixed bucket-boundary slice with the literal column "ul.duration_ms"; join/where come from buildUsageWhere ($N-parameterized)
 	q := `
 SELECT
   ` + rangeExpr + ` AS range,
