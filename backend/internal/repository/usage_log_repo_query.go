@@ -591,7 +591,7 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		ActualCost:                actualCost,
 		RateMultiplier:            rateMultiplier,
 		AccountRateMultiplier:     nullFloat64Ptr(accountRateMultiplier),
-		BillingType:               int8(billingType),
+		BillingType:               int8(billingType), //nolint:gosec // G115: app is the sole writer of usage_logs.billing_type, always 0 or 1 per service.UsageLog.BillingType's own int8 type
 		RequestType:               service.RequestTypeFromInt16(requestTypeRaw),
 		ImageCount:                imageCount,
 		VideoCount:                videoCount,

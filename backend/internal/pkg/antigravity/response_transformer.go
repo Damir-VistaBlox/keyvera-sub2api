@@ -348,27 +348,35 @@ func buildGroundingText(grounding *GeminiGroundingMetadata) string {
 // fallbackCounter 降级伪随机 ID 的全局计数器，混入 seed 避免高并发下 UnixNano 相同导致碰撞。
 var fallbackCounter uint64
 
+const randomIDChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 // generateRandomID 生成密码学安全的随机 ID
 func generateRandomID() string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	id := make([]byte, 12)
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
 		// 避免在请求路径里 panic：极端情况下熵源不可用时降级为伪随机。
 		// 这里主要用于生成响应/工具调用的临时 ID，安全要求不高但需尽量避免碰撞。
 		cnt := atomic.AddUint64(&fallbackCounter, 1)
-		seed := uint64(time.Now().UnixNano()) ^ cnt
+		seed := uint64(time.Now().UnixNano()) ^ cnt //nolint:gosec // G115: UnixNano() is always positive on any real system clock; non-crypto PRNG seed for the crypto/rand-failure fallback path only
 		seed ^= uint64(len(err.Error())) << 32
-		for i := range id {
-			seed ^= seed << 13
-			seed ^= seed >> 7
-			seed ^= seed << 17
-			id[i] = chars[int(seed)%len(chars)]
-		}
-		return string(id)
+		return generateFallbackID(seed)
 	}
 	for i, b := range randBytes {
-		id[i] = chars[int(b)%len(chars)]
+		id[i] = randomIDChars[int(b)%len(randomIDChars)]
+	}
+	return string(id)
+}
+
+// generateFallbackID 使用给定的初始 seed 生成一个 12 字符的伪随机 ID。
+// seed 经 xorshift64 演化后取模选字符，全程无符号运算，避免负数索引 panic。
+func generateFallbackID(seed uint64) string {
+	id := make([]byte, 12)
+	for i := range id {
+		seed ^= seed << 13
+		seed ^= seed >> 7
+		seed ^= seed << 17
+		id[i] = randomIDChars[seed%uint64(len(randomIDChars))]
 	}
 	return string(id)
 }

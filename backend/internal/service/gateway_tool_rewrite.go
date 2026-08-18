@@ -70,7 +70,7 @@ func buildDynamicToolMap(toolNames []string) map[string]string {
 		}
 		_, _ = h.Write([]byte(n))
 	}
-	rng := rand.New(rand.NewSource(int64(h.Sum64())))
+	rng := rand.New(rand.NewSource(int64(h.Sum64()))) //nolint:gosec // G115: FNV hash used purely as a PRNG seed for a cosmetic fake-tool-name prefix pool, not a security or correctness value
 
 	available := make([]string, len(fakeToolNamePrefixes))
 	copy(available, fakeToolNamePrefixes)

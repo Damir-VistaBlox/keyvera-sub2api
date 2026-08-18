@@ -11,7 +11,7 @@ import (
 func hashAdvisoryLockID(key string) int64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(key))
-	return int64(h.Sum64())
+	return int64(h.Sum64()) //nolint:gosec // G115: same-width 64->64 bit reinterpretation (not narrowing) for an opaque Postgres advisory-lock key; every call site passes a fixed internal lock name
 }
 
 func tryAcquireDBAdvisoryLock(ctx context.Context, db *sql.DB, lockID int64) (func(), bool) {

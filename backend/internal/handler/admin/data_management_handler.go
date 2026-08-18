@@ -473,7 +473,7 @@ func (h *DataManagementHandler) ListBackupJobs(c *gin.Context) {
 			response.BadRequest(c, "Invalid page_size")
 			return
 		}
-		pageSize = int32(v)
+		pageSize = int32(v) //nolint:gosec // G109: ListBackupJobs is a permanently-deprecated stub (see deprecatedError below); PageSize is never read
 	}
 
 	result, err := h.dataManagementService.ListBackupJobs(c.Request.Context(), service.DataManagementListBackupJobsInput{

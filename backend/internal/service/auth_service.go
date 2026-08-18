@@ -1871,7 +1871,7 @@ func resolvedTokenVersion(user *User) int64 {
 
 	material := strings.ToLower(strings.TrimSpace(user.Email)) + "\n" + user.PasswordHash
 	sum := sha256.Sum256([]byte(material))
-	fingerprint := int64(binary.BigEndian.Uint64(sum[:8]) & 0x7fffffffffffffff)
+	fingerprint := int64(binary.BigEndian.Uint64(sum[:8]) & 0x7fffffffffffffff) //nolint:gosec // G115: explicitly masked with &0x7fffffffffffffff immediately before conversion, so the cast is unconditionally lossless
 	return user.TokenVersion ^ fingerprint
 }
 

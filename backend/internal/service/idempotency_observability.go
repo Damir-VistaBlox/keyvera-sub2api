@@ -72,7 +72,7 @@ func recordIdempotencyProcessingDuration(endpoint, scope string, duration time.D
 		duration = 0
 	}
 	defaultIdempotencyMetrics.processingDurationCount.Add(1)
-	defaultIdempotencyMetrics.processingDurationMicros.Add(uint64(duration.Microseconds()))
+	defaultIdempotencyMetrics.processingDurationMicros.Add(uint64(duration.Microseconds())) //nolint:gosec // G115: duration is clamped >=0 two lines above; even time.Duration's max value in microseconds is far below uint64's range
 	logIdempotencyMetric("idempotency_processing_duration_ms", endpoint, scope, strconv.FormatFloat(duration.Seconds()*1000, 'f', 3, 64), attrs)
 }
 

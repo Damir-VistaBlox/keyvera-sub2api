@@ -210,7 +210,7 @@ func normalizeLockKeys(keys ...string) []string {
 func advisoryLockHash(key string) int64 {
 	hasher := fnv.New64a()
 	_, _ = hasher.Write([]byte(key))
-	return int64(hasher.Sum64())
+	return int64(hasher.Sum64()) //nolint:gosec // G115: same-width 64->64 bit reinterpretation (not narrowing) for an opaque Postgres advisory-lock key
 }
 
 func lockRepositoryScopedKeys(ctx context.Context, client *dbent.Client, exec sqlQueryExecutor, keys ...string) (func(), error) {

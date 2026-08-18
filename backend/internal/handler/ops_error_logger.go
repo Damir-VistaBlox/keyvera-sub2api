@@ -904,7 +904,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 						case int16:
 							return &t
 						case int:
-							v16 := int16(t)
+							v16 := int16(t) //nolint:gosec // G115: dead defensive branch: the sole writer, setOpsEndpointContext, always stores an int16 for a ~6-value enum
 							return &v16
 						}
 					}
@@ -1047,7 +1047,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 					case int16:
 						return &t
 					case int:
-						v16 := int16(t)
+						v16 := int16(t) //nolint:gosec // G115: dead defensive branch: the sole writer, setOpsEndpointContext, always stores an int16 for a ~6-value enum
 						return &v16
 					}
 				}
@@ -1199,7 +1199,7 @@ func logOpsStreamError(c *gin.Context, ops *service.OpsService, wireStatus int) 
 				case int16:
 					return &t
 				case int:
-					v16 := int16(t)
+					v16 := int16(t) //nolint:gosec // G115: dead defensive branch: the sole writer, setOpsEndpointContext, always stores an int16 for a ~6-value enum
 					return &v16
 				}
 			}

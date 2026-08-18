@@ -152,8 +152,8 @@ func encodeOpenAIImageTestWebPVP8(width, height int) string {
 	copy(header[8:12], "WEBP")
 	copy(header[12:16], "VP8 ")
 	copy(header[23:26], "\x9d\x01\x2a")
-	binary.LittleEndian.PutUint16(header[26:28], uint16(width))
-	binary.LittleEndian.PutUint16(header[28:30], uint16(height))
+	binary.LittleEndian.PutUint16(header[26:28], uint16(width))  //nolint:gosec // G115: test-only: only ever called with the hardcoded literal 1280x720
+	binary.LittleEndian.PutUint16(header[28:30], uint16(height)) //nolint:gosec // G115: test-only: only ever called with the hardcoded literal 1280x720
 	return base64.StdEncoding.EncodeToString(header)
 }
 

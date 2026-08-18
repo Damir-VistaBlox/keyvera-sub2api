@@ -96,7 +96,7 @@ func (c *driveClient) GetStorageQuota(ctx context.Context, accessToken, proxyURL
 			resp.StatusCode == http.StatusServiceUnavailable) && attempt < maxRetries-1 {
 			if err := func() error {
 				defer func() { _ = resp.Body.Close() }()
-				backoff := time.Duration(1<<uint(attempt)) * time.Second
+				backoff := time.Duration(1<<uint(attempt)) * time.Second //nolint:gosec // G115: attempt is bounded by a hardcoded maxRetries=3 loop
 				jitter := time.Duration(rng.Intn(1000)) * time.Millisecond
 				return sleepWithContext(backoff + jitter)
 			}(); err != nil {

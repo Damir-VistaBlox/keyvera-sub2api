@@ -2,6 +2,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
@@ -31,6 +32,23 @@ type TLSFingerprintProfile struct {
 func (p *TLSFingerprintProfile) Validate() error {
 	if p.Name == "" {
 		return &ValidationError{Field: "name", Message: "name is required"}
+	}
+	// PointFormats 和 PSKModes 在 dialer 中会被下转为 uint8（TLS 协议要求），
+	// 超出 uint8 范围的值会被静默截断，产生与配置不符的指纹。
+	if err := validateUint8Range("point_formats", p.PointFormats); err != nil {
+		return err
+	}
+	if err := validateUint8Range("psk_modes", p.PSKModes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateUint8Range(field string, vals []uint16) error {
+	for _, v := range vals {
+		if v > 255 {
+			return &ValidationError{Field: field, Message: fmt.Sprintf("value %d exceeds the maximum of 255", v)}
+		}
 	}
 	return nil
 }

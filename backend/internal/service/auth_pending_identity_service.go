@@ -166,7 +166,7 @@ func normalizeAuthPendingIdentityLockKeys(keys ...string) []string {
 func authPendingIdentityAdvisoryLockHash(key string) int64 {
 	hasher := fnv.New64a()
 	_, _ = hasher.Write([]byte(key))
-	return int64(hasher.Sum64())
+	return int64(hasher.Sum64()) //nolint:gosec // G115: FNV hash used only as an opaque pg_advisory_xact_lock key; Postgres bigint accepts any 64-bit pattern
 }
 
 func lockAuthPendingIdentityKeys(ctx context.Context, client *dbent.Client, keys ...string) (func(), error) {

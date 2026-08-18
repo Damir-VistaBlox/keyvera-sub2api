@@ -661,7 +661,7 @@ func calculateSubscriptionGatewayBaseAmount(amount, usdToCnyRate float64, curren
 	}
 	return decimal.NewFromFloat(amount).
 		Mul(decimal.NewFromFloat(rate)).
-		Round(int32(payment.CurrencyMaxFractionDigits(currency))).
+		Round(int32(payment.CurrencyMaxFractionDigits(currency))). //nolint:gosec // G115: CurrencyMaxFractionDigits is always one of 4 hardcoded package-level literals, value in {0,2,3}; used only as a decimal.Round precision arg
 		InexactFloat64()
 }
 

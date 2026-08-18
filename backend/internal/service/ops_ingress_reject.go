@@ -398,10 +398,10 @@ func ingressRejectHash(k ingressRejectKey) int {
 			h *= 1099511628211
 		}
 	}
-	h ^= uint64(k.userID)
+	h ^= uint64(k.userID) //nolint:gosec // G115: only feeds an in-memory shard-selection hash; the real dedup key is the full struct compared via native map equality
 	h *= 1099511628211
-	h ^= uint64(k.apiKeyID)
-	return int(h & 0x7fffffff)
+	h ^= uint64(k.apiKeyID)    //nolint:gosec // G115: only feeds an in-memory shard-selection hash; the real dedup key is the full struct compared via native map equality
+	return int(h & 0x7fffffff) //nolint:gosec // G115: masked to 31 bits (&0x7fffffff) immediately before the int() conversion
 }
 
 func aggregateFromKey(k ingressRejectKey, bucket, now time.Time) *OpsIngressRejectAggregate {

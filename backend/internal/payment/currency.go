@@ -75,7 +75,7 @@ func CurrencyMaxFractionDigits(currency string) int {
 
 // FormatAmountForCurrency 按币种允许的小数位格式化支付金额。
 func FormatAmountForCurrency(amount float64, currency string) string {
-	return decimal.NewFromFloat(amount).StringFixed(int32(CurrencyMaxFractionDigits(currency)))
+	return decimal.NewFromFloat(amount).StringFixed(int32(CurrencyMaxFractionDigits(currency))) //nolint:gosec // G115: maxFractionDigits is always one of 4 hardcoded package-level literals, value in {0,2,3}
 }
 
 func paymentCurrencyAmountUnitFor(currency string) paymentCurrencyAmountUnit {
@@ -99,7 +99,7 @@ func AmountToMinorUnit(amountStr, currency string) (int64, error) {
 		return 0, err
 	}
 	amountUnit := paymentCurrencyAmountUnitFor(normalizedCurrency)
-	precisionFactor := decimal.New(1, int32(amountUnit.maxFractionDigits))
+	precisionFactor := decimal.New(1, int32(amountUnit.maxFractionDigits)) //nolint:gosec // G115: amountUnit.maxFractionDigits is always one of 4 hardcoded package-level literals, value in {0,2,3}
 	scaledForPrecision := d.Mul(precisionFactor)
 	if !scaledForPrecision.Equal(scaledForPrecision.Truncate(0)) {
 		if amountUnit.maxFractionDigits == 0 {
@@ -107,12 +107,12 @@ func AmountToMinorUnit(amountStr, currency string) (int64, error) {
 		}
 		return 0, fmt.Errorf("payment amount for %s must not have more than %d decimal places", normalizedCurrency, amountUnit.maxFractionDigits)
 	}
-	factor := decimal.New(1, int32(amountUnit.apiMinorUnit))
+	factor := decimal.New(1, int32(amountUnit.apiMinorUnit)) //nolint:gosec // G115: amountUnit.apiMinorUnit is always one of 4 hardcoded package-level literals, value in {0,2,3}
 	minorAmount := d.Mul(factor)
 	return minorAmount.IntPart(), nil
 }
 
 func MinorUnitToAmount(value int64, currency string) float64 {
-	factor := decimal.New(1, int32(CurrencyMinorUnit(currency)))
+	factor := decimal.New(1, int32(CurrencyMinorUnit(currency))) //nolint:gosec // G115: CurrencyMinorUnit returns apiMinorUnit, always one of 4 hardcoded package-level literals, value in {0,2,3}
 	return decimal.NewFromInt(value).Div(factor).InexactFloat64()
 }

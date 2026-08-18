@@ -27,7 +27,7 @@ func generateStableSessionID(contents []GeminiContent) string {
 		if content.Role == "user" && len(content.Parts) > 0 {
 			if text := content.Parts[0].Text; text != "" {
 				h := sha256.Sum256([]byte(text))
-				n := int64(binary.BigEndian.Uint64(h[:8])) & 0x7FFFFFFFFFFFFFFF
+				n := int64(binary.BigEndian.Uint64(h[:8])) & 0x7FFFFFFFFFFFFFFF //nolint:gosec // G115: sign bit is explicitly masked off (&0x7FFFFFFFFFFFFFFF) immediately after the conversion; only feeds a display session ID
 				return "-" + strconv.FormatInt(n, 10)
 			}
 		}

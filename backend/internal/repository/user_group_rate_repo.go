@@ -312,7 +312,7 @@ func (r *userGroupRateRepository) SyncGroupRPMOverrides(ctx context.Context, gro
 			clearUserIDs = append(clearUserIDs, e.UserID)
 		} else {
 			upsertUserIDs = append(upsertUserIDs, e.UserID)
-			upsertValues = append(upsertValues, int32(*e.RPMOverride))
+			upsertValues = append(upsertValues, int32(*e.RPMOverride)) //nolint:gosec // G115: callers must validate 0 <= RPMOverride <= math.MaxInt32 before reaching here; see adminServiceImpl.BatchSetGroupRPMOverrides
 		}
 	}
 
