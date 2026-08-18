@@ -527,10 +527,14 @@ type ContentModerationService struct {
 	lastCleanupDeletedNonHit atomic.Int64
 	runtimeSnapshot          atomic.Pointer[contentModerationRuntimeSnapshot]
 	runtimeRefreshMu         sync.Mutex
-	runtimeCacheTTL          time.Duration
-	runtimeRefreshRetryAt    atomic.Int64
-	keyHealthMu              sync.Mutex
-	keyHealth                map[string]*contentModerationKeyHealth
+	// runtimeCacheTTL is a test-only override (nanoseconds; 0 means "use the
+	// default"). atomic because the background worker goroutine started by
+	// NewContentModerationService can read it before a test finishes
+	// configuring the service otherwise -- see #29.
+	runtimeCacheTTL       atomic.Int64
+	runtimeRefreshRetryAt atomic.Int64
+	keyHealthMu           sync.Mutex
+	keyHealth             map[string]*contentModerationKeyHealth
 }
 
 type contentModerationRuntimeSnapshot struct {
@@ -1531,8 +1535,10 @@ func (s *ContentModerationService) loadRuntimeSnapshot(ctx context.Context) (*co
 }
 
 func (s *ContentModerationService) runtimeSnapshotTTL() time.Duration {
-	if s != nil && s.runtimeCacheTTL > 0 {
-		return s.runtimeCacheTTL
+	if s != nil {
+		if ttl := time.Duration(s.runtimeCacheTTL.Load()); ttl > 0 {
+			return ttl
+		}
 	}
 	return contentModerationRuntimeCacheTTL
 }

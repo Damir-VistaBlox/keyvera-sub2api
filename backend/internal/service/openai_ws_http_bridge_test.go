@@ -63,7 +63,6 @@ func TestOpenAIWSHTTPBridgeDecisionKeepsSmallFramesOnWS(t *testing.T) {
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnTransportErrorFailoverSafety(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name         string
@@ -123,7 +122,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnTransportErrorFailoverSafety(t *testing.T) {
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnHTTPStatusFailoverSafety(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name         string
@@ -176,7 +174,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnHTTPStatusFailoverSafety(t *testing.T) {
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnSSEErrorFailoverSafety(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	for _, turn := range []int{1, 2} {
 		t.Run(fmt.Sprintf("turn_%d", turn), func(t *testing.T) {
@@ -224,7 +221,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnSSEErrorFailoverSafety(t *testing.T) {
 // 的 server_error：Codex 对 server_is_overloaded/slow_down 判致命并终止会话。
 // 账号状态判定使用改写前的原始事件，不受影响。
 func TestProxyOpenAIWSHTTPBridgeTurnRewritesCapacityShedCodeForClient(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name    string
@@ -284,7 +280,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnRewritesCapacityShedCodeForClient(t *testing
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnRequiresTerminalEvent(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name         string
@@ -339,7 +334,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnRequiresTerminalEvent(t *testing.T) {
 }
 
 func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_bridge","model":"gpt-5"}}`,
@@ -467,7 +461,6 @@ func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,
@@ -512,7 +505,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,
@@ -584,7 +576,6 @@ func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t 
 }
 
 func TestProxyResponsesWebSocketFromClientForGrokUsesXAIHTTPBridgeAndPreservesMappedModels(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	bridgeResponse := func(responseID, requestID string, cachedTokens int) *http.Response {
 		sseBody := strings.Join([]string{
@@ -761,7 +752,6 @@ func TestProxyResponsesWebSocketFromClientForGrokUsesXAIHTTPBridgeAndPreservesMa
 }
 
 func TestOpenAIWSHTTPBridgeAcceptsFirstFrameAboveLegacy16MiB(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_large_bridge","model":"gpt-5"}}`,
@@ -893,7 +883,6 @@ func TestOpenAIWSHTTPBridgeAcceptsFirstFrameAboveLegacy16MiB(t *testing.T) {
 }
 
 func TestOpenAIWSHTTPBridgeKeepsContinuationFramesOnHTTPWithoutPreviousResponseID(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	firstSSEBody := strings.Join([]string{
 		`data: {"type":"response.completed","response":{"id":"resp_bridge_first","model":"gpt-5.1","output":[{"type":"function_call","id":"fc_bridge_1","call_id":"call_bridge_1","name":"shell","arguments":"{}"}],"usage":{"input_tokens":9,"output_tokens":1}}}`,
@@ -1048,7 +1037,6 @@ func TestOpenAIWSHTTPBridgeKeepsContinuationFramesOnHTTPWithoutPreviousResponseI
 }
 
 func TestOpenAIWSHTTPBridge_IdleTimeoutClosesClientSession(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 
 	sseBody := strings.Join([]string{
 		`data: {"type":"response.completed","response":{"id":"resp_bridge_idle","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`,
