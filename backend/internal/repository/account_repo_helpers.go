@@ -106,7 +106,10 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 
 	outAccounts := make([]service.Account, 0, len(accounts))
 	for _, acc := range accounts {
-		out := accountEntityToService(acc)
+		out, err := r.accountEntityToService(acc)
+		if err != nil {
+			return nil, err
+		}
 		if out == nil {
 			continue
 		}
@@ -309,6 +312,13 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 	if m == nil {
 		return nil
 	}
+	return accountEntityToServiceWithCredentials(m, copyJSONMap(m.Credentials))
+}
+
+func accountEntityToServiceWithCredentials(m *dbent.Account, credentials map[string]any) *service.Account {
+	if m == nil {
+		return nil
+	}
 
 	rateMultiplier := m.RateMultiplier
 
@@ -318,7 +328,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Notes:                   m.Notes,
 		Platform:                m.Platform,
 		Type:                    m.Type,
-		Credentials:             copyJSONMap(m.Credentials),
+		Credentials:             normalizeJSONMap(credentials),
 		Extra:                   copyJSONMap(m.Extra),
 		ProxyID:                 m.ProxyID,
 		ProxyFallbackOriginID:   m.ProxyFallbackOriginID,

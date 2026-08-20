@@ -58,7 +58,7 @@ func (r *accountRepository) updateUpstreamBillingProbeSnapshotInTx(
 	if err != nil {
 		return err
 	}
-	credentials, err := json.Marshal(account.Credentials)
+	credentials, _, err := credentialsPlaintextJSONAndDigest(account.Credentials)
 	if err != nil {
 		return err
 	}
@@ -98,6 +98,17 @@ func (r *accountRepository) updateUpstreamBillingProbeSnapshotInTx(
 	if account.ProxyID != nil {
 		proxyID = *account.ProxyID
 	}
+	identityMatch := "credentials = $5::jsonb"
+	args := []any{string(payload), account.ID, account.Platform, account.Type, credentials, proxyID, string(expectedSnapshotJSON), string(expectedEnabledJSON), string(expectedRateSyncEnabledJSON), rateMultiplier}
+	if r != nil && r.encryptor != nil {
+		storedCredentials, storedDigest, err := r.credentialsStorageJSONAndDigest(account.Credentials)
+		if err != nil {
+			return err
+		}
+		credentials = storedCredentials
+		identityMatch = accountCredentialsMatchSQL("credentials", "$5", "$11")
+		args = []any{string(payload), account.ID, account.Platform, account.Type, credentials, proxyID, string(expectedSnapshotJSON), string(expectedEnabledJSON), string(expectedRateSyncEnabledJSON), rateMultiplier, storedDigest}
+	}
 	result, err := client.ExecContext(ctx, `
 		UPDATE accounts
 		SET
@@ -110,16 +121,16 @@ func (r *accountRepository) updateUpstreamBillingProbeSnapshotInTx(
 				ELSE rate_multiplier
 			END,
 			updated_at = NOW()
-		WHERE id = $2
-			AND platform = $3
-			AND type = $4
-			AND credentials = $5::jsonb
-			AND proxy_id IS NOT DISTINCT FROM $6
+			WHERE id = $2
+				AND platform = $3
+				AND type = $4
+					AND `+identityMatch+`
+				AND proxy_id IS NOT DISTINCT FROM $6
 			AND COALESCE(extra -> 'upstream_billing_probe', 'null'::jsonb) = $7::jsonb
 			AND COALESCE(extra -> 'upstream_billing_probe_enabled', 'null'::jsonb) = $8::jsonb
 			AND COALESCE(extra -> 'upstream_billing_rate_sync_enabled', 'null'::jsonb) = $9::jsonb
 			AND deleted_at IS NULL
-	`, string(payload), account.ID, account.Platform, account.Type, string(credentials), proxyID, string(expectedSnapshotJSON), string(expectedEnabledJSON), string(expectedRateSyncEnabledJSON), rateMultiplier)
+		`, args...)
 	if err != nil {
 		return err
 	}
