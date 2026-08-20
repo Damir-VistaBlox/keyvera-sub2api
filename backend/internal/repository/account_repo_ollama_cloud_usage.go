@@ -16,11 +16,17 @@ const (
 	ollamaCloudBaseURLMatchSQLPrefix = "btrim("
 	ollamaCloudBaseURLMatchSQLSuffix = ") ~ '" + ollamaCloudBaseURLRegexSQL + "'"
 	ollamaCloudUsageEligibleSQL      = `
-	platform IN ('openai', 'anthropic')
-	AND type = 'apikey'
-	AND ` + ollamaCloudBaseURLMatchSQLPrefix + `credentials ->> 'base_url'` + ollamaCloudBaseURLMatchSQLSuffix + `
-	AND jsonb_typeof(credentials -> 'api_key') = 'string'
-`
+		platform IN ('openai', 'anthropic')
+		AND type = 'apikey'
+		AND ` + ollamaCloudBaseURLMatchSQLPrefix + `credentials ->> 'base_url'` + ollamaCloudBaseURLMatchSQLSuffix + `
+		AND jsonb_typeof(credentials -> 'api_key') = 'string'
+	`
+	ollamaCloudUsageEligibleEncryptedSQL = `
+		platform IN ('openai', 'anthropic')
+		AND type = 'apikey'
+		AND ` + ollamaCloudBaseURLMatchSQLPrefix + `COALESCE(credentials -> '` + accountCredentialsIndexesKey + `' ->> 'base_url', credentials ->> 'base_url')` + ollamaCloudBaseURLMatchSQLSuffix + `
+		AND COALESCE(((credentials -> '` + accountCredentialsIndexesKey + `' ->> 'api_key_present')::boolean), jsonb_typeof(credentials -> 'api_key') = 'string', false)
+	`
 )
 
 func ollamaCloudBaseURLMatchesSQL(expression string) string {
@@ -35,6 +41,7 @@ func (r *accountRepository) ListOllamaCloudUsageGroupAccounts(ctx context.Contex
 		return nil, service.ErrOllamaCloudUsageUnavailable
 	}
 	keys := make([]string, 0, len(accounts))
+	keyHashes := make([]string, 0, len(accounts))
 	seen := make(map[string]struct{}, len(accounts))
 	for _, account := range accounts {
 		if !service.IsOllamaCloudUsageAccount(account) || account.Credentials == nil {
@@ -49,18 +56,27 @@ func (r *accountRepository) ListOllamaCloudUsageGroupAccounts(ctx context.Contex
 		}
 		seen[apiKey] = struct{}{}
 		keys = append(keys, apiKey)
+		keyHashes = append(keyHashes, credentialSHA256String(apiKey))
 	}
 	if len(keys) == 0 {
 		return []service.Account{}, nil
+	}
+	eligibleSQL := ollamaCloudUsageEligibleSQL
+	keyPredicate := "credentials ->> 'api_key' = ANY($1)"
+	args := []any{pq.Array(keys)}
+	if r.encryptor != nil {
+		eligibleSQL = ollamaCloudUsageEligibleEncryptedSQL
+		keyPredicate = "(credentials -> '" + accountCredentialsIndexesKey + "' ->> 'api_key_sha256' = ANY($1) OR credentials ->> 'api_key' = ANY($2))"
+		args = []any{pq.Array(keyHashes), pq.Array(keys)}
 	}
 	rows, err := r.sql.QueryContext(ctx, `
 		SELECT id
 		FROM accounts
 		WHERE deleted_at IS NULL
-			AND `+ollamaCloudUsageEligibleSQL+`
-			AND credentials ->> 'api_key' = ANY($1)
-		ORDER BY id
-	`, pq.Array(keys))
+				AND `+eligibleSQL+`
+				AND `+keyPredicate+`
+			ORDER BY id
+		`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +206,7 @@ func (r *accountRepository) updateOllamaCloudUsageGroup(
 		if !matchesProxy {
 			return service.ErrOllamaCloudUsageIdentityChanged
 		}
-		members, err := lockOllamaCloudUsageGroup(txCtx, client, account, apiKey)
+		members, err := lockOllamaCloudUsageGroup(txCtx, client, account, apiKey, r.encryptor != nil)
 		if err != nil {
 			return err
 		}
@@ -235,6 +251,14 @@ func (r *accountRepository) updateOllamaCloudUsageGroup(
 		for index := range members {
 			memberIDs[index] = members[index].id
 		}
+		eligibleSQL := ollamaCloudUsageEligibleSQL
+		keyPredicate := "credentials ->> 'api_key' = $2"
+		args := []any{string(encoded), apiKey, pq.Array(memberIDs)}
+		if r.encryptor != nil {
+			eligibleSQL = ollamaCloudUsageEligibleEncryptedSQL
+			keyPredicate = accountCredentialsAPIKeyMatchesSQL("credentials", "$2", "$4")
+			args = append(args, credentialSHA256String(apiKey))
+		}
 		result, err := client.ExecContext(txCtx, `
 			UPDATE accounts
 			SET extra = (COALESCE(extra, '{}'::jsonb)
@@ -243,10 +267,10 @@ func (r *accountRepository) updateOllamaCloudUsageGroup(
 					- 'ollama_cloud_usage_snapshot') || $1::jsonb,
 				updated_at = NOW()
 			WHERE deleted_at IS NULL
-				AND `+ollamaCloudUsageEligibleSQL+`
-				AND credentials ->> 'api_key' = $2
-				AND id = ANY($3)
-		`, string(encoded), apiKey, pq.Array(memberIDs))
+				AND `+eligibleSQL+`
+					AND `+keyPredicate+`
+					AND id = ANY($3)
+			`, args...)
 		if err != nil {
 			return err
 		}
@@ -282,8 +306,9 @@ func lockOllamaCloudUsageGroup(
 	client *dbent.Client,
 	account *service.Account,
 	apiKey string,
+	encrypted ...bool,
 ) ([]lockedOllamaCloudUsageMember, error) {
-	credentials, err := json.Marshal(normalizeJSONMap(account.Credentials))
+	credentials, digest, err := credentialsPlaintextJSONAndDigest(account.Credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -291,24 +316,34 @@ func lockOllamaCloudUsageGroup(
 	if account.ProxyID != nil {
 		proxyID = *account.ProxyID
 	}
+	identityMatch := "credentials = $5::jsonb"
+	keyPredicate := "credentials ->> 'api_key' = $1"
+	eligibleSQL := ollamaCloudUsageEligibleSQL
+	args := []any{apiKey, account.ID, account.Platform, account.Type, credentials, proxyID}
+	if len(encrypted) > 0 && encrypted[0] {
+		eligibleSQL = ollamaCloudUsageEligibleEncryptedSQL
+		identityMatch = accountCredentialsMatchSQL("credentials", "$5", "$7")
+		keyPredicate = accountCredentialsAPIKeyMatchesSQL("credentials", "$1", "$8")
+		args = append(args, digest, credentialSHA256String(apiKey))
+	}
 	rows, err := client.QueryContext(ctx, `
 		SELECT
 			id,
 			id = $2
 				AND platform = $3
 				AND type = $4
-				AND credentials = $5::jsonb
-				AND proxy_id IS NOT DISTINCT FROM $6,
+					AND `+identityMatch+`
+					AND proxy_id IS NOT DISTINCT FROM $6,
 			COALESCE((extra -> 'ollama_cloud_usage_session')::text, 'null'),
 			COALESCE((extra -> 'ollama_cloud_usage_auto_refresh')::text, 'null'),
 			COALESCE((extra -> 'ollama_cloud_usage_snapshot')::text, 'null')
 		FROM accounts
 		WHERE deleted_at IS NULL
-			AND `+ollamaCloudUsageEligibleSQL+`
-			AND credentials ->> 'api_key' = $1
-		ORDER BY id
-		FOR NO KEY UPDATE
-	`, apiKey, account.ID, account.Platform, account.Type, string(credentials), proxyID)
+				AND `+eligibleSQL+`
+				AND `+keyPredicate+`
+			ORDER BY id
+			FOR NO KEY UPDATE
+		`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -422,26 +457,34 @@ func (r *accountRepository) ListDueOllamaCloudUsageAccounts(
 	debounceSeconds := debounce.Seconds()
 	maxWaitSeconds := maxWait.Seconds()
 	minFetchIntervalSeconds := service.OllamaCloudUsageMinFetchInterval.Seconds()
+	eligibleSQL := ollamaCloudUsageEligibleSQL
+	apiKeyGroupExpr := "credentials ->> 'api_key'"
+	hasAPIKeySQL := "jsonb_typeof(credentials -> 'api_key') = 'string'"
+	if r.encryptor != nil {
+		eligibleSQL = ollamaCloudUsageEligibleEncryptedSQL
+		apiKeyGroupExpr = "COALESCE(credentials -> '" + accountCredentialsIndexesKey + "' ->> 'api_key_sha256', credentials ->> 'api_key')"
+		hasAPIKeySQL = accountCredentialsHasAPIKeySQL("credentials")
+	}
 	rows, err := r.sql.QueryContext(ctx, `
 		WITH eligible AS (
 			SELECT id,
-				credentials ->> 'api_key' AS api_key,
+				`+apiKeyGroupExpr+` AS api_key,
 				last_used_at,
 				extra -> 'ollama_cloud_usage_snapshot' AS snapshot
 			FROM accounts
 			WHERE deleted_at IS NULL
 				AND status = 'active'
-				AND `+ollamaCloudUsageEligibleSQL+`
+				AND `+eligibleSQL+`
 				AND jsonb_typeof(extra -> 'ollama_cloud_usage_session') = 'string'
 				AND extra @> '{"ollama_cloud_usage_auto_refresh": true}'::jsonb
 		), group_activity AS (
-			SELECT credentials ->> 'api_key' AS api_key,
+			SELECT `+apiKeyGroupExpr+` AS api_key,
 				MAX(last_used_at) AS group_last_used_at
 			FROM accounts
 			WHERE deleted_at IS NULL
-				AND `+ollamaCloudUsageEligibleSQL+`
-				AND jsonb_typeof(credentials -> 'api_key') = 'string'
-			GROUP BY credentials ->> 'api_key'
+				AND `+eligibleSQL+`
+				AND `+hasAPIKeySQL+`
+			GROUP BY `+apiKeyGroupExpr+`
 		), joined AS (
 			SELECT e.id, e.api_key, e.snapshot, g.group_last_used_at,
 				e.snapshot #>> '{status}' AS status,

@@ -9,12 +9,58 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+func (r *accountRepository) credentialsMatchSQLForStorage(column, jsonArg, digestArg string) string {
+	if r != nil && r.encryptor != nil {
+		return accountCredentialsMatchSQL(column, jsonArg, digestArg)
+	}
+	return column + " = " + jsonArg + "::jsonb"
+}
+
+func (r *accountRepository) credentialsJSONForStorage(credentials map[string]any) (string, string, error) {
+	if r != nil && r.encryptor != nil {
+		return r.credentialsStorageJSONAndDigest(credentials)
+	}
+	payload, err := json.Marshal(normalizeJSONMap(credentials))
+	if err != nil {
+		return "", "", err
+	}
+	return string(payload), "", nil
+}
+
+func (r *accountRepository) appendDigestArg(args []any, digest string) []any {
+	if r != nil && r.encryptor != nil {
+		return append(args, digest)
+	}
+	return args
+}
+
+func (r *accountRepository) snapshotDigestArg(snapshot service.GrokCredentialMutationSnapshot) []any {
+	if r != nil && r.encryptor != nil {
+		return []any{sha256Hex([]byte(snapshot.CredentialsJSON))}
+	}
+	return nil
+}
+
 func (r *accountRepository) SetGrokCredentialErrorIfMatch(
 	ctx context.Context,
 	id int64,
 	snapshot service.GrokCredentialMutationSnapshot,
 	errorMsg string,
 ) (bool, error) {
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$7", "$11")
+	args := []any{
+		service.StatusError,
+		errorMsg,
+		id,
+		service.StatusActive,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		snapshot.CredentialsJSON,
+		snapshot.ProxyID,
+		string(service.GrokCredentialReasonProxyInvalid),
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = append(args, r.snapshotDigestArg(snapshot)...)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -32,7 +78,7 @@ func (r *accountRepository) SetGrokCredentialErrorIfMatch(
 			AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= NOW())
 			AND (a.overload_until IS NULL OR a.overload_until <= NOW())
 			AND (a.auto_pause_on_expired IS NOT TRUE OR a.expires_at IS NULL OR a.expires_at > NOW())
-			AND a.credentials = $7::jsonb
+				AND `+credentialsMatchSQL+`
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 			AND ($2 <> $9 OR (
 				a.proxy_id IS NOT NULL AND NOT EXISTS (
@@ -43,9 +89,7 @@ func (r *accountRepository) SetGrokCredentialErrorIfMatch(
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $10, updated.id, NULL, NULL FROM updated
-	`, service.StatusError, errorMsg, id, service.StatusActive, service.PlatformGrok, service.AccountTypeOAuth,
-		snapshot.CredentialsJSON, snapshot.ProxyID, string(service.GrokCredentialReasonProxyInvalid),
-		service.SchedulerOutboxEventAccountChanged)
+		`, args...)
 	if err != nil {
 		return false, err
 	}
@@ -71,10 +115,26 @@ func (r *accountRepository) SetGrokOAuthErrorIfCredentialsUnchanged(
 	if r == nil || r.sql == nil {
 		return false, errors.New("account repository SQL executor is not configured")
 	}
-	expectedJSON, err := json.Marshal(normalizeJSONMap(expectedCredentials))
+	expectedJSON, expectedDigest, err := r.credentialsJSONForStorage(expectedCredentials)
 	if err != nil {
 		return false, err
 	}
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$7", "$9")
+	refreshTokenAbsentSQL := "NULLIF(BTRIM(a.credentials->>'refresh_token'), '') IS NULL"
+	if r.encryptor != nil {
+		refreshTokenAbsentSQL = accountCredentialsRefreshTokenAbsentSQL("a.credentials")
+	}
+	args := []any{
+		service.StatusError,
+		errorMsg,
+		id,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		service.StatusActive,
+		expectedJSON,
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = r.appendDigestArg(args, expectedDigest)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -87,22 +147,13 @@ func (r *accountRepository) SetGrokOAuthErrorIfCredentialsUnchanged(
 			AND a.platform = $4
 			AND a.type = $5
 			AND a.status = $6
-			AND a.credentials = $7::jsonb
-			AND NULLIF(BTRIM(a.credentials->>'refresh_token'), '') IS NULL
+				AND `+credentialsMatchSQL+`
+				AND `+refreshTokenAbsentSQL+`
 		RETURNING a.id
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $8, updated.id, NULL, NULL FROM updated
-	`,
-		service.StatusError,
-		errorMsg,
-		id,
-		service.PlatformGrok,
-		service.AccountTypeOAuth,
-		service.StatusActive,
-		string(expectedJSON),
-		service.SchedulerOutboxEventAccountChanged,
-	)
+	`, args...)
 	if err != nil {
 		return false, err
 	}
@@ -132,14 +183,25 @@ func (r *accountRepository) UpdateGrokOAuthCredentialsIfUnchanged(
 	if r == nil || r.sql == nil {
 		return false, errors.New("account repository SQL executor is not configured")
 	}
-	expectedJSON, err := json.Marshal(normalizeJSONMap(expectedCredentials))
+	expectedJSON, expectedDigest, err := r.credentialsJSONForStorage(expectedCredentials)
 	if err != nil {
 		return false, err
 	}
-	credentialsJSON, err := json.Marshal(normalizeJSONMap(credentials))
+	credentialsJSON, _, err := r.credentialsJSONForStorage(credentials)
 	if err != nil {
 		return false, err
 	}
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$5", "$8")
+	args := []any{
+		credentialsJSON,
+		id,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		expectedJSON,
+		expectedProxyID,
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = r.appendDigestArg(args, expectedDigest)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -149,21 +211,13 @@ func (r *accountRepository) UpdateGrokOAuthCredentialsIfUnchanged(
 			AND a.deleted_at IS NULL
 			AND a.platform = $3
 			AND a.type = $4
-			AND a.credentials = $5::jsonb
+			AND `+credentialsMatchSQL+`
 			AND a.proxy_id IS NOT DISTINCT FROM $6
 		RETURNING a.id
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $7, updated.id, NULL, NULL FROM updated
-	`,
-		string(credentialsJSON),
-		id,
-		service.PlatformGrok,
-		service.AccountTypeOAuth,
-		string(expectedJSON),
-		expectedProxyID,
-		service.SchedulerOutboxEventAccountChanged,
-	)
+	`, args...)
 	if err != nil {
 		return false, err
 	}
@@ -192,10 +246,23 @@ func (r *accountRepository) SetGrokOAuthRefreshErrorIfCredentialsUnchanged(
 	if r == nil || r.sql == nil {
 		return false, errors.New("account repository SQL executor is not configured")
 	}
-	expectedJSON, err := json.Marshal(normalizeJSONMap(expectedCredentials))
+	expectedJSON, expectedDigest, err := r.credentialsJSONForStorage(expectedCredentials)
 	if err != nil {
 		return false, err
 	}
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$7", "$10")
+	args := []any{
+		service.StatusError,
+		errorMsg,
+		id,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		service.StatusActive,
+		expectedJSON,
+		expectedProxyID,
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = r.appendDigestArg(args, expectedDigest)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -208,23 +275,13 @@ func (r *accountRepository) SetGrokOAuthRefreshErrorIfCredentialsUnchanged(
 			AND a.platform = $4
 			AND a.type = $5
 			AND a.status = $6
-			AND a.credentials = $7::jsonb
+				AND `+credentialsMatchSQL+`
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 		RETURNING a.id
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
-	`,
-		service.StatusError,
-		errorMsg,
-		id,
-		service.PlatformGrok,
-		service.AccountTypeOAuth,
-		service.StatusActive,
-		string(expectedJSON),
-		expectedProxyID,
-		service.SchedulerOutboxEventAccountChanged,
-	)
+	`, args...)
 	if err != nil {
 		return false, err
 	}
@@ -253,10 +310,23 @@ func (r *accountRepository) SetGrokOAuthRefreshTempUnschedulableIfCredentialsUnc
 	if r == nil || r.sql == nil {
 		return false, errors.New("account repository SQL executor is not configured")
 	}
-	expectedJSON, err := json.Marshal(normalizeJSONMap(expectedCredentials))
+	expectedJSON, expectedDigest, err := r.credentialsJSONForStorage(expectedCredentials)
 	if err != nil {
 		return false, err
 	}
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$7", "$10")
+	args := []any{
+		until,
+		reason,
+		id,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		service.StatusActive,
+		expectedJSON,
+		expectedProxyID,
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = r.appendDigestArg(args, expectedDigest)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -268,24 +338,14 @@ func (r *accountRepository) SetGrokOAuthRefreshTempUnschedulableIfCredentialsUnc
 			AND a.platform = $4
 			AND a.type = $5
 			AND a.status = $6
-			AND a.credentials = $7::jsonb
+				AND `+credentialsMatchSQL+`
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 			AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until < $1)
 		RETURNING a.id
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
-	`,
-		until,
-		reason,
-		id,
-		service.PlatformGrok,
-		service.AccountTypeOAuth,
-		service.StatusActive,
-		string(expectedJSON),
-		expectedProxyID,
-		service.SchedulerOutboxEventAccountChanged,
-	)
+	`, args...)
 	if err != nil {
 		return false, err
 	}
@@ -307,6 +367,19 @@ func (r *accountRepository) SetGrokCredentialTempUnschedulableIfMatch(
 	until time.Time,
 	reason string,
 ) (bool, error) {
+	credentialsMatchSQL := r.credentialsMatchSQLForStorage("a.credentials", "$7", "$10")
+	args := []any{
+		until,
+		reason,
+		id,
+		service.StatusActive,
+		service.PlatformGrok,
+		service.AccountTypeOAuth,
+		snapshot.CredentialsJSON,
+		snapshot.ProxyID,
+		service.SchedulerOutboxEventAccountChanged,
+	}
+	args = append(args, r.snapshotDigestArg(snapshot)...)
 	result, err := r.sql.ExecContext(ctx, `
 		WITH updated AS (
 		UPDATE accounts AS a
@@ -326,14 +399,13 @@ func (r *accountRepository) SetGrokCredentialTempUnschedulableIfMatch(
 			AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= NOW())
 			AND (a.overload_until IS NULL OR a.overload_until <= NOW())
 			AND (a.auto_pause_on_expired IS NOT TRUE OR a.expires_at IS NULL OR a.expires_at > NOW())
-			AND a.credentials = $7::jsonb
+				AND `+credentialsMatchSQL+`
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 		RETURNING a.id
 		)
 		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
-	`, until, reason, id, service.StatusActive, service.PlatformGrok, service.AccountTypeOAuth,
-		snapshot.CredentialsJSON, snapshot.ProxyID, service.SchedulerOutboxEventAccountChanged)
+		`, args...)
 	if err != nil {
 		return false, err
 	}
