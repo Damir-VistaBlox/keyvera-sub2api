@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -192,8 +190,7 @@ func (s *APIKeyService) StopAuthCacheInvalidationSubscriber() {
 }
 
 func (s *APIKeyService) authCacheKey(key string) string {
-	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
+	return APIKeyAuthCacheKeyFromCredentialOrStorageValue(key)
 }
 
 func (s *APIKeyService) getAuthCacheEntry(ctx context.Context, cacheKey string) (*APIKeyAuthCacheEntry, bool) {

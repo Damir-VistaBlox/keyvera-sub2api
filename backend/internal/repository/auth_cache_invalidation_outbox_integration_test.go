@@ -122,3 +122,46 @@ func TestAuthCacheInvalidationTriggers_CoverSecurityMutationsOnly(t *testing.T) 
 	require.Equal(t, cacheKey, stored)
 	require.NotContains(t, stored, keyValue)
 }
+
+func TestAuthCacheInvalidationTriggers_UseDigestFromStoredAPIKeyHash(t *testing.T) {
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	group := mustCreateGroup(t, integrationEntClient, &service.Group{
+		Name: fmt.Sprintf("auth-outbox-hashed-group-%d", suffix), RateMultiplier: 1, IsExclusive: true,
+	})
+	user := mustCreateUser(t, integrationEntClient, &service.User{
+		Email: fmt.Sprintf("auth-outbox-hashed-%d@example.com", suffix), Concurrency: 5,
+	})
+	groupID := group.ID
+	keyValue := fmt.Sprintf("sk-auth-outbox-hashed-%d", suffix)
+	apiKeyRepo := NewAPIKeyRepository(integrationEntClient, integrationDB)
+	key := &service.APIKey{UserID: user.ID, GroupID: &groupID, Key: keyValue, Name: "outbox-hashed", Status: service.StatusActive}
+	require.NoError(t, apiKeyRepo.Create(ctx, key))
+
+	sum := sha256.Sum256([]byte(keyValue))
+	cacheKey := hex.EncodeToString(sum[:])
+	clear := func() {
+		_, err := integrationDB.ExecContext(ctx, "DELETE FROM auth_cache_invalidation_outbox WHERE cache_key = $1", cacheKey)
+		require.NoError(t, err)
+	}
+	count := func() int {
+		var value int
+		require.NoError(t, integrationDB.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM auth_cache_invalidation_outbox WHERE cache_key = $1", cacheKey).Scan(&value))
+		return value
+	}
+	clear()
+	t.Cleanup(clear)
+	t.Cleanup(func() {
+		_, err := integrationDB.ExecContext(ctx, "DELETE FROM api_keys WHERE id = $1", key.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, "DELETE FROM users WHERE id = $1", user.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, "DELETE FROM groups WHERE id = $1", group.ID)
+		require.NoError(t, err)
+	})
+
+	_, err := integrationDB.ExecContext(ctx, "UPDATE api_keys SET status = 'disabled' WHERE id = $1", key.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, count(), "hashed stored keys must enqueue the raw-key cache digest, not a hash of the storage value")
+}

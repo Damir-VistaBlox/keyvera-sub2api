@@ -51,7 +51,8 @@ func (s *APIKeyRepoSuite) TestCreate() {
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
-	s.Require().Equal("sk-create-test", got.Key)
+	s.Require().Equal(service.HashAPIKeyForStorage("sk-create-test"), got.Key)
+	s.Require().Equal("sk-create-test", key.Key, "Create should leave the one-time plaintext value available to the caller")
 }
 
 func (s *APIKeyRepoSuite) TestGetByID_NotFound() {
@@ -75,6 +76,7 @@ func (s *APIKeyRepoSuite) TestGetByKey() {
 	got, err := s.repo.GetByKey(s.ctx, key.Key)
 	s.Require().NoError(err, "GetByKey")
 	s.Require().Equal(key.ID, got.ID)
+	s.Require().Equal(service.HashAPIKeyForStorage(key.Key), got.Key)
 	s.Require().NotNil(got.User, "expected User preload")
 	s.Require().Equal(user.ID, got.User.ID)
 	s.Require().NotNil(got.Group, "expected Group preload")
@@ -84,6 +86,25 @@ func (s *APIKeyRepoSuite) TestGetByKey() {
 func (s *APIKeyRepoSuite) TestGetByKey_NotFound() {
 	_, err := s.repo.GetByKey(s.ctx, "non-existent-key")
 	s.Require().Error(err, "expected error for non-existent key")
+}
+
+func (s *APIKeyRepoSuite) TestGetByKey_LegacyPlaintextRow() {
+	user := s.mustCreateUser("getbykey-legacy@test.com")
+	created, err := s.client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sk-legacy-plaintext").
+		SetName("Legacy").
+		SetStatus(service.StatusActive).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	got, err := s.repo.GetByKey(s.ctx, "sk-legacy-plaintext")
+	s.Require().NoError(err, "legacy plaintext keys must remain valid during rolling upgrades")
+	s.Require().Equal(created.ID, got.ID)
+
+	exists, err := s.repo.ExistsByKey(s.ctx, "sk-legacy-plaintext")
+	s.Require().NoError(err)
+	s.Require().True(exists)
 }
 
 func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConfig() {
@@ -144,7 +165,7 @@ func (s *APIKeyRepoSuite) TestUpdate() {
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID after update")
-	s.Require().Equal("sk-update", got.Key, "Update should not change key")
+	s.Require().Equal(service.HashAPIKeyForStorage("sk-update"), got.Key, "Update should not change stored key")
 	s.Require().Equal(user.ID, got.UserID, "Update should not change user_id")
 	s.Require().Equal("Renamed", got.Name)
 	s.Require().Equal(service.StatusDisabled, got.Status)
@@ -391,7 +412,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 
 	got2, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
-	s.Require().Equal("sk-test-1", got2.Key, "Update should not change key")
+	s.Require().Equal(service.HashAPIKeyForStorage("sk-test-1"), got2.Key, "Update should not change stored key")
 	s.Require().Equal(user.ID, got2.UserID, "Update should not change user_id")
 	s.Require().Equal("Renamed", got2.Name)
 	s.Require().Equal(service.StatusDisabled, got2.Status)
@@ -513,7 +534,7 @@ func (s *APIKeyRepoSuite) TestIncrementQuotaUsedAndGetState() {
 	s.Require().Equal(3.5, state.QuotaUsed)
 	s.Require().Equal(3.0, state.Quota)
 	s.Require().Equal(service.StatusAPIKeyQuotaExhausted, state.Status)
-	s.Require().Equal(key.Key, state.Key)
+	s.Require().Equal(service.HashAPIKeyForStorage(key.Key), state.Key)
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")

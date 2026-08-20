@@ -37,7 +37,8 @@ func (APIKey) Fields() []ent.Field {
 		field.String("key").
 			MaxLen(128).
 			NotEmpty().
-			Unique(),
+			Unique().
+			Sensitive(),
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),

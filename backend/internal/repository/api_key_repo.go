@@ -45,7 +45,7 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
-		SetKey(key.Key).
+		SetKey(service.HashAPIKeyForStorage(key.Key)).
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
@@ -110,7 +110,7 @@ func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (stri
 
 func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
-		Where(apikey.KeyEQ(key)).
+		Where(apikey.KeyIn(service.APIKeyStorageLookupValues(key)...)).
 		WithUser(func(q *dbent.UserQuery) {
 			q.WithAllowedGroups(func(gq *dbent.GroupQuery) {
 				gq.Select(group.FieldID)
@@ -129,7 +129,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
-		Where(apikey.KeyEQ(key)).
+		Where(apikey.KeyIn(service.APIKeyStorageLookupValues(key)...)).
 		Select(
 			apikey.FieldID,
 			apikey.FieldUserID,
@@ -610,7 +610,7 @@ func (r *apiKeyRepository) CountByUserID(ctx context.Context, userID int64) (int
 }
 
 func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, error) {
-	count, err := r.activeQuery().Where(apikey.KeyEQ(key)).Count(ctx)
+	count, err := r.activeQuery().Where(apikey.KeyIn(service.APIKeyStorageLookupValues(key)...)).Count(ctx)
 	return count > 0, err
 }
 
