@@ -315,8 +315,7 @@ func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) erro
 
 	enabled := s.cfg.Security.TrustForwardedIPForAPIKeyACL
 	headers := s.cfg.ForwardedClientIPSettings().Headers
-	storedValue, hasStoredValue := values[SettingKeyAPIKeyACLTrustForwardedIP]
-	if hasStoredValue {
+	if storedValue, ok := values[SettingKeyAPIKeyACLTrustForwardedIP]; ok {
 		enabled = storedValue == "true"
 	}
 
@@ -342,12 +341,6 @@ func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) erro
 	}
 	if values[settingKeyForwardedClientIPModeV2] != "true" {
 		updates[settingKeyForwardedClientIPModeV2] = "true"
-		// Before this migration, new installations persisted false by default.
-		// Restore compatibility only when no trusted-proxy policy was configured.
-		if headersErr == nil && hasStoredValue && !enabled && !s.cfg.Server.TrustedProxiesConfigured {
-			enabled = true
-			updates[SettingKeyAPIKeyACLTrustForwardedIP] = "true"
-		}
 	}
 	if len(updates) > 0 {
 		if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
