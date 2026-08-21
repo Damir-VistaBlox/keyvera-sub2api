@@ -257,15 +257,6 @@ func (r *liveBillingUserRepo) GetByID(context.Context, int64) (*User, error) {
 	return r.user, nil
 }
 
-type liveBillingSubscriptionRepo struct {
-	UserSubscriptionRepository
-	subscription *UserSubscription
-}
-
-func (r *liveBillingSubscriptionRepo) GetByID(context.Context, int64) (*UserSubscription, error) {
-	return r.subscription, nil
-}
-
 type liveBillingRepo struct {
 	UsageBillingRepository
 	mu       sync.Mutex
