@@ -31,6 +31,11 @@ func TestGatewayCacheLiveCallIdentityAndController(t *testing.T) {
 		CreatedAt:             time.Now(),
 		ExpiresAt:             time.Now().Add(time.Hour),
 		Controller:            service.LiveControllerPending,
+		GroupRateMultiplier:   1.7,
+		GroupSubscriptionType: service.SubscriptionTypeSubscription,
+		AudioRealtimePriceMin: float64PtrForLiveCacheTest(0.12),
+		APIKeyQuota:           9,
+		APIKeyRateLimit5h:     3,
 	}
 	require.NoError(t, cache.SaveLiveCall(context.Background(), record, time.Hour))
 
@@ -39,6 +44,12 @@ func TestGatewayCacheLiveCallIdentityAndController(t *testing.T) {
 	require.Equal(t, record.CallID, loaded.CallID)
 	require.Equal(t, record.AccountID, loaded.AccountID)
 	require.Equal(t, record.AttestationCiphertext, loaded.AttestationCiphertext)
+	require.Equal(t, record.GroupRateMultiplier, loaded.GroupRateMultiplier)
+	require.Equal(t, record.GroupSubscriptionType, loaded.GroupSubscriptionType)
+	require.NotNil(t, loaded.AudioRealtimePriceMin)
+	require.Equal(t, *record.AudioRealtimePriceMin, *loaded.AudioRealtimePriceMin)
+	require.Equal(t, record.APIKeyQuota, loaded.APIKeyQuota)
+	require.Equal(t, record.APIKeyRateLimit5h, loaded.APIKeyRateLimit5h)
 
 	claimed, err := cache.ClaimLiveController(context.Background(), record.CallHash, service.LiveControllerObserver, "observer-1")
 	require.NoError(t, err)
@@ -59,4 +70,8 @@ func TestGatewayCacheLiveCallIdentityAndController(t *testing.T) {
 	closed, err = cache.MarkLiveCallClosed(context.Background(), record.CallHash, time.Hour)
 	require.NoError(t, err)
 	require.False(t, closed)
+}
+
+func float64PtrForLiveCacheTest(v float64) *float64 {
+	return &v
 }

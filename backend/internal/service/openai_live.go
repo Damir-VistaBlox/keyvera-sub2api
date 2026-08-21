@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	coderws "github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -228,6 +229,13 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 			UserAgent:             identity.UserAgent,
 			IPAddress:             identity.IPAddress,
 			InboundEndpoint:       identity.InboundEndpoint,
+			GroupRateMultiplier:   identity.GroupRateMultiplier,
+			GroupSubscriptionType: identity.GroupSubscriptionType,
+			AudioRealtimePriceMin: cloneFloat64Ptr(identity.AudioRealtimePriceMin),
+			APIKeyQuota:           identity.APIKeyQuota,
+			APIKeyRateLimit5h:     identity.APIKeyRateLimit5h,
+			APIKeyRateLimit1d:     identity.APIKeyRateLimit1d,
+			APIKeyRateLimit7d:     identity.APIKeyRateLimit7d,
 			AttestationCiphertext: attestationCiphertext,
 		}
 		mappingTTL := s.liveMaxSessionDuration() + 5*time.Minute
@@ -824,31 +832,160 @@ func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
 	if record.SubscriptionID > 0 {
 		billingType = BillingTypeSubscription
 	}
-	// TODO(billing): Live 会话目前不计费：TotalCost/ActualCost 恒为 0，完全绕过
-	// recordUsageCore/applyUsageBilling，余额模式下极低余额也能反复开启最长
-	// liveMaxSessionDuration 的会话。若确认按时长计费，应在此接入计费管道；
-	// 若确认有意免费，删除本注释即可（零值行为由
-	// TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage 锁定）。
-	//
+	cost, rateMultiplier := s.calculateLiveCallCost(context.Background(), record, duration)
+	billingMode := cost.BillingMode
+	mediaType := "audio/realtime"
+	accountRateMultiplier := 1.0
+	account, user, apiKey, subscription := s.liveCallBillingContext(context.Background(), record)
+	if account != nil {
+		accountRateMultiplier = account.BillingRateMultiplier()
+	}
+	accountRateMultiplierPtr := accountRateMultiplier
+	isSubscriptionBilling := subscription != nil && apiKey != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	if isSubscriptionBilling {
+		billingType = BillingTypeSubscription
+	}
+
+	usageLog := &UsageLog{
+		UserID:                record.UserID,
+		APIKeyID:              record.APIKeyID,
+		AccountID:             record.AccountID,
+		RequestID:             record.CallHash,
+		Model:                 record.Model,
+		RequestedModel:        record.Model,
+		GroupID:               liveOptionalID(record.GroupID),
+		SubscriptionID:        liveOptionalID(record.SubscriptionID),
+		RateMultiplier:        rateMultiplier,
+		AccountRateMultiplier: &accountRateMultiplierPtr,
+		BillingType:           billingType,
+		BillingMode:           &billingMode,
+		RequestType:           RequestTypeLive,
+		MediaType:             &mediaType,
+		DurationMs:            &duration,
+		TotalCost:             cost.TotalCost,
+		ActualCost:            cost.ActualCost,
+		UserAgent:             &userAgent,
+		IPAddress:             &ipAddress,
+		InboundEndpoint:       &inboundEndpoint,
+		UpstreamEndpoint:      &upstreamEndpoint,
+		CreatedAt:             record.CreatedAt,
+	}
+	if cost.ActualCost > 0 && account != nil && user != nil && apiKey != nil && s.usageBillingRepo != nil && (s.cfg == nil || s.cfg.RunMode != config.RunModeSimple) {
+		_, billingErr := applyUsageBilling(context.Background(), record.CallHash, usageLog, &postUsageBillingParams{
+			Cost:                  cost,
+			User:                  user,
+			APIKey:                apiKey,
+			Account:               account,
+			Subscription:          subscription,
+			IsSubscriptionBill:    isSubscriptionBilling,
+			AccountRateMultiplier: accountRateMultiplier,
+			APIKeyService:         liveAPIKeyQuotaUpdater{},
+			Platform:              PlatformOpenAI,
+		}, s.billingDeps(), s.usageBillingRepo)
+		if billingErr != nil {
+			usageLog.ActualCost = 0
+		}
+	}
 	// 这是该会话唯一一次落库机会（MarkLiveCallClosed 已标记 first），失败即永久
 	// 丢失，因此走带日志与同步兜底的 writeUsageLogBestEffort（issue #3656）。
-	writeUsageLogBestEffort(context.Background(), s.usageLogRepo, &UsageLog{
-		UserID:           record.UserID,
-		APIKeyID:         record.APIKeyID,
-		AccountID:        record.AccountID,
-		RequestID:        record.CallHash,
-		Model:            record.Model,
-		RequestedModel:   record.Model,
-		GroupID:          liveOptionalID(record.GroupID),
-		SubscriptionID:   liveOptionalID(record.SubscriptionID),
-		RateMultiplier:   1,
-		BillingType:      billingType,
-		RequestType:      RequestTypeLive,
-		DurationMs:       &duration,
-		UserAgent:        &userAgent,
-		IPAddress:        &ipAddress,
-		InboundEndpoint:  &inboundEndpoint,
-		UpstreamEndpoint: &upstreamEndpoint,
-		CreatedAt:        record.CreatedAt,
-	}, "service.openai_live")
+	writeUsageLogBestEffort(context.Background(), s.usageLogRepo, usageLog, "service.openai_live")
+}
+
+func (s *OpenAIGatewayService) calculateLiveCallCost(ctx context.Context, record *LiveCallRecord, durationMs int) (*CostBreakdown, float64) {
+	if durationMs <= 0 {
+		return &CostBreakdown{}, liveCallRateMultiplier(s, ctx, record)
+	}
+	multiplier := liveCallRateMultiplier(s, ctx, record)
+	billingService := s.billingService
+	if billingService == nil {
+		billingService = &BillingService{}
+	}
+	cfg := &audioPriceConfig{RealtimePerMin: record.AudioRealtimePriceMin}
+	return billingService.CalculateAudioCost("realtime", float64(durationMs)/float64(time.Minute/time.Millisecond), cfg, multiplier), multiplier
+}
+
+func liveCallRateMultiplier(s *OpenAIGatewayService, ctx context.Context, record *LiveCallRecord) float64 {
+	multiplier := 1.0
+	if s != nil && s.cfg != nil {
+		multiplier = s.cfg.Default.RateMultiplier
+	}
+	if record != nil && record.GroupID > 0 {
+		groupDefault := record.GroupRateMultiplier
+		if groupDefault <= 0 {
+			groupDefault = multiplier
+		}
+		if s != nil {
+			return s.ResolveUserGroupRateMultiplier(ctx, record.UserID, record.GroupID, groupDefault)
+		}
+		return groupDefault
+	}
+	return multiplier
+}
+
+func (s *OpenAIGatewayService) liveCallBillingContext(ctx context.Context, record *LiveCallRecord) (*Account, *User, *APIKey, *UserSubscription) {
+	if s == nil || record == nil {
+		return nil, nil, nil, nil
+	}
+	var account *Account
+	if s.accountRepo != nil && record.AccountID > 0 {
+		account, _ = s.accountRepo.GetByID(ctx, record.AccountID)
+	}
+	var user *User
+	if s.userRepo != nil && record.UserID > 0 {
+		user, _ = s.userRepo.GetByID(ctx, record.UserID)
+	}
+	var subscription *UserSubscription
+	if s.userSubRepo != nil && record.SubscriptionID > 0 {
+		subscription, _ = s.userSubRepo.GetByID(ctx, record.SubscriptionID)
+	}
+	apiKey := &APIKey{
+		ID:          record.APIKeyID,
+		UserID:      record.UserID,
+		GroupID:     liveOptionalID(record.GroupID),
+		Quota:       record.APIKeyQuota,
+		RateLimit5h: record.APIKeyRateLimit5h,
+		RateLimit1d: record.APIKeyRateLimit1d,
+		RateLimit7d: record.APIKeyRateLimit7d,
+		Group:       liveCallGroupSnapshot(record),
+	}
+	return account, user, apiKey, subscription
+}
+
+func liveCallGroupSnapshot(record *LiveCallRecord) *Group {
+	if record == nil || record.GroupID <= 0 {
+		return nil
+	}
+	subscriptionType := record.GroupSubscriptionType
+	if subscriptionType == "" && record.SubscriptionID > 0 {
+		subscriptionType = SubscriptionTypeSubscription
+	}
+	rateMultiplier := record.GroupRateMultiplier
+	if rateMultiplier <= 0 {
+		rateMultiplier = 1
+	}
+	return &Group{
+		ID:                       record.GroupID,
+		Platform:                 PlatformOpenAI,
+		RateMultiplier:           rateMultiplier,
+		SubscriptionType:         subscriptionType,
+		AudioRealtimePricePerMin: cloneFloat64Ptr(record.AudioRealtimePriceMin),
+	}
+}
+
+type liveAPIKeyQuotaUpdater struct{}
+
+func (liveAPIKeyQuotaUpdater) UpdateQuotaUsed(context.Context, int64, float64) error {
+	return nil
+}
+
+func (liveAPIKeyQuotaUpdater) UpdateRateLimitUsage(context.Context, int64, float64) error {
+	return nil
+}
+
+func cloneFloat64Ptr(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }

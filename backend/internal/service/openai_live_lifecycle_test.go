@@ -248,6 +248,38 @@ func (r *liveTestUsageRepo) Create(_ context.Context, log *UsageLog) (bool, erro
 	return true, nil
 }
 
+type liveBillingUserRepo struct {
+	UserRepository
+	user *User
+}
+
+func (r *liveBillingUserRepo) GetByID(context.Context, int64) (*User, error) {
+	return r.user, nil
+}
+
+type liveBillingSubscriptionRepo struct {
+	UserSubscriptionRepository
+	subscription *UserSubscription
+}
+
+func (r *liveBillingSubscriptionRepo) GetByID(context.Context, int64) (*UserSubscription, error) {
+	return r.subscription, nil
+}
+
+type liveBillingRepo struct {
+	UsageBillingRepository
+	mu       sync.Mutex
+	commands []*UsageBillingCommand
+}
+
+func (r *liveBillingRepo) Apply(_ context.Context, cmd *UsageBillingCommand) (*UsageBillingApplyResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	copy := *cmd
+	r.commands = append(r.commands, &copy)
+	return &UsageBillingApplyResult{Applied: true}, nil
+}
+
 func TestRunLiveControllerClosesExpiredSession(t *testing.T) {
 	upstream := newLiveTestFrameConn()
 	record := &LiveCallRecord{ExpiresAt: time.Now().Add(20 * time.Millisecond)}
@@ -265,29 +297,40 @@ func TestRunLiveControllerClosesExpiredSession(t *testing.T) {
 	}
 }
 
-func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
+func TestFinalizeLiveCallIsIdempotentAndBillsRealtimeUsage(t *testing.T) {
+	realtimePrice := 0.10
 	record := &LiveCallRecord{
-		CallID:          "call_secret",
-		CallHash:        hashLiveCallID("call_secret"),
-		AccountID:       11,
-		APIKeyID:        22,
-		UserID:          33,
-		GroupID:         44,
-		LeaseID:         "lease-1",
-		Model:           "gpt-live-test",
-		CreatedAt:       time.Now().Add(-time.Second),
-		ExpiresAt:       time.Now().Add(time.Hour),
-		Controller:      LiveControllerPending,
-		InboundEndpoint: "/v1/live",
+		CallID:                "call_secret",
+		CallHash:              hashLiveCallID("call_secret"),
+		AccountID:             11,
+		APIKeyID:              22,
+		UserID:                33,
+		GroupID:               44,
+		LeaseID:               "lease-1",
+		Model:                 "gpt-live-test",
+		CreatedAt:             time.Now().Add(-2 * time.Minute),
+		ExpiresAt:             time.Now().Add(time.Hour),
+		Controller:            LiveControllerPending,
+		InboundEndpoint:       "/v1/live",
+		GroupRateMultiplier:   2,
+		GroupSubscriptionType: SubscriptionTypeStandard,
+		AudioRealtimePriceMin: &realtimePrice,
+		APIKeyQuota:           10,
 	}
 	store := &liveTestStore{}
 	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
 	concurrencyCache := &liveTestConcurrencyCache{}
 	usageRepo := &liveTestUsageRepo{}
+	billingRepo := &liveBillingRepo{}
 	service := &OpenAIGatewayService{
 		cache:              store,
+		accountRepo:        &liveTestAccountRepo{account: &Account{ID: record.AccountID, Type: AccountTypeOAuth, Platform: PlatformOpenAI}},
+		userRepo:           &liveBillingUserRepo{user: &User{ID: record.UserID}},
+		usageBillingRepo:   billingRepo,
 		concurrencyService: NewConcurrencyService(concurrencyCache),
 		usageLogRepo:       usageRepo,
+		billingService:     NewBillingService(&config.Config{}, nil),
+		deferredService:    NewDeferredService(nil, nil, 0),
 	}
 
 	service.finalizeLiveCall(record)
@@ -306,8 +349,16 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 	require.NotNil(t, log.DurationMs)
 	require.Zero(t, log.InputTokens)
 	require.Zero(t, log.OutputTokens)
-	require.Zero(t, log.TotalCost)
-	require.Zero(t, log.ActualCost)
+	require.InDelta(t, 0.20, log.TotalCost, 0.01)
+	require.InDelta(t, 0.40, log.ActualCost, 0.02)
+	require.Equal(t, "audio/realtime", *log.MediaType)
+	billingRepo.mu.Lock()
+	require.Len(t, billingRepo.commands, 1)
+	cmd := billingRepo.commands[0]
+	billingRepo.mu.Unlock()
+	require.Equal(t, record.CallHash, cmd.RequestID)
+	require.InDelta(t, log.ActualCost, cmd.BalanceCost, 1e-8)
+	require.InDelta(t, log.ActualCost, cmd.APIKeyQuotaCost, 1e-8)
 }
 
 func TestGetLiveCallForIdentityRejectsMismatchedCaller(t *testing.T) {
