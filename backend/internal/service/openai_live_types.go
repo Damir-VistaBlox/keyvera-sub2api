@@ -47,6 +47,14 @@ type LiveCallIdentity struct {
 	UserAgent       string
 	IPAddress       string
 	InboundEndpoint string
+
+	GroupRateMultiplier   float64
+	GroupSubscriptionType string
+	AudioRealtimePriceMin *float64
+	APIKeyQuota           float64
+	APIKeyRateLimit5h     float64
+	APIKeyRateLimit1d     float64
+	APIKeyRateLimit7d     float64
 }
 
 type LiveCallRecord struct {
@@ -66,6 +74,15 @@ type LiveCallRecord struct {
 	UserAgent       string
 	IPAddress       string
 	InboundEndpoint string
+	// Billing snapshot fields are captured at create time because finalize may
+	// run later in a background observer with only the Redis live-call record.
+	GroupRateMultiplier   float64
+	GroupSubscriptionType string
+	AudioRealtimePriceMin *float64
+	APIKeyQuota           float64
+	APIKeyRateLimit5h     float64
+	APIKeyRateLimit1d     float64
+	APIKeyRateLimit7d     float64
 	// AttestationCiphertext 仅用于让同一会话的 Sideband 复用创建时的证明。
 	AttestationCiphertext string
 }

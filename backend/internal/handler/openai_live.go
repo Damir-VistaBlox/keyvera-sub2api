@@ -153,15 +153,25 @@ func liveCallIdentity(
 		value := subscription.ID
 		subscriptionID = &value
 	}
-	return service.LiveCallIdentity{
-		APIKeyID:        apiKey.ID,
-		UserID:          userID,
-		GroupID:         apiKey.GroupID,
-		SubscriptionID:  subscriptionID,
-		UserAgent:       c.GetHeader("User-Agent"),
-		IPAddress:       ip.GetClientIP(c),
-		InboundEndpoint: GetInboundEndpoint(c),
+	identity := service.LiveCallIdentity{
+		APIKeyID:          apiKey.ID,
+		UserID:            userID,
+		GroupID:           apiKey.GroupID,
+		SubscriptionID:    subscriptionID,
+		UserAgent:         c.GetHeader("User-Agent"),
+		IPAddress:         ip.GetClientIP(c),
+		InboundEndpoint:   GetInboundEndpoint(c),
+		APIKeyQuota:       apiKey.Quota,
+		APIKeyRateLimit5h: apiKey.RateLimit5h,
+		APIKeyRateLimit1d: apiKey.RateLimit1d,
+		APIKeyRateLimit7d: apiKey.RateLimit7d,
 	}
+	if apiKey.Group != nil {
+		identity.GroupRateMultiplier = apiKey.Group.RateMultiplier
+		identity.GroupSubscriptionType = apiKey.Group.SubscriptionType
+		identity.AudioRealtimePriceMin = apiKey.Group.AudioRealtimePricePerMin
+	}
+	return identity
 }
 
 func (h *OpenAIGatewayHandler) writeLiveCreateError(c *gin.Context, err error) {

@@ -204,22 +204,31 @@ func (c *gatewayCache) SaveLiveCall(ctx context.Context, record *service.LiveCal
 		return fmt.Errorf("invalid live call record")
 	}
 	values := map[string]any{
-		"call_id":          record.CallID,
-		"account_id":       record.AccountID,
-		"api_key_id":       record.APIKeyID,
-		"user_id":          record.UserID,
-		"group_id":         record.GroupID,
-		"subscription_id":  record.SubscriptionID,
-		"lease_id":         record.LeaseID,
-		"model":            record.Model,
-		"created_at":       record.CreatedAt.UnixMilli(),
-		"expires_at":       record.ExpiresAt.UnixMilli(),
-		"controller":       record.Controller,
-		"controller_owner": record.ControllerOwner,
-		"user_agent":       record.UserAgent,
-		"ip_address":       record.IPAddress,
-		"inbound_endpoint": record.InboundEndpoint,
-		"attestation":      record.AttestationCiphertext,
+		"call_id":                 record.CallID,
+		"account_id":              record.AccountID,
+		"api_key_id":              record.APIKeyID,
+		"user_id":                 record.UserID,
+		"group_id":                record.GroupID,
+		"subscription_id":         record.SubscriptionID,
+		"lease_id":                record.LeaseID,
+		"model":                   record.Model,
+		"created_at":              record.CreatedAt.UnixMilli(),
+		"expires_at":              record.ExpiresAt.UnixMilli(),
+		"controller":              record.Controller,
+		"controller_owner":        record.ControllerOwner,
+		"user_agent":              record.UserAgent,
+		"ip_address":              record.IPAddress,
+		"inbound_endpoint":        record.InboundEndpoint,
+		"attestation":             record.AttestationCiphertext,
+		"group_rate_multiplier":   strconv.FormatFloat(record.GroupRateMultiplier, 'f', -1, 64),
+		"group_subscription_type": record.GroupSubscriptionType,
+		"api_key_quota":           strconv.FormatFloat(record.APIKeyQuota, 'f', -1, 64),
+		"api_key_rate_limit_5h":   strconv.FormatFloat(record.APIKeyRateLimit5h, 'f', -1, 64),
+		"api_key_rate_limit_1d":   strconv.FormatFloat(record.APIKeyRateLimit1d, 'f', -1, 64),
+		"api_key_rate_limit_7d":   strconv.FormatFloat(record.APIKeyRateLimit7d, 'f', -1, 64),
+	}
+	if record.AudioRealtimePriceMin != nil {
+		values["audio_realtime_price_min"] = strconv.FormatFloat(*record.AudioRealtimePriceMin, 'f', -1, 64)
 	}
 	key := liveCallKey(record.CallHash)
 	pipe := c.rdb.TxPipeline()
@@ -241,6 +250,21 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 		value, _ := strconv.ParseInt(values[field], 10, 64)
 		return value
 	}
+	parseFloat := func(field string) float64 {
+		value, _ := strconv.ParseFloat(values[field], 64)
+		return value
+	}
+	parseFloatPtr := func(field string) *float64 {
+		raw, ok := values[field]
+		if !ok || raw == "" {
+			return nil
+		}
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil
+		}
+		return &value
+	}
 	createdAt := time.UnixMilli(parseInt("created_at"))
 	expiresAt := time.UnixMilli(parseInt("expires_at"))
 	return &service.LiveCallRecord{
@@ -260,6 +284,13 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 		UserAgent:             values["user_agent"],
 		IPAddress:             values["ip_address"],
 		InboundEndpoint:       values["inbound_endpoint"],
+		GroupRateMultiplier:   parseFloat("group_rate_multiplier"),
+		GroupSubscriptionType: values["group_subscription_type"],
+		AudioRealtimePriceMin: parseFloatPtr("audio_realtime_price_min"),
+		APIKeyQuota:           parseFloat("api_key_quota"),
+		APIKeyRateLimit5h:     parseFloat("api_key_rate_limit_5h"),
+		APIKeyRateLimit1d:     parseFloat("api_key_rate_limit_1d"),
+		APIKeyRateLimit7d:     parseFloat("api_key_rate_limit_7d"),
 		AttestationCiphertext: values["attestation"],
 	}, nil
 }
